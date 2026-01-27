@@ -127,12 +127,10 @@ export default function DashboardPage() {
 
     filteredSharedFiles.forEach((file) => {
       const assigneeId = file.assignedTo ?? "unassigned";
-      if (!groups[assigneeId]) {
-        groups[assigneeId] = {
-          assigneeName: file.assigneeName ?? "Family Documents",
-          files: [],
-        };
-      }
+      groups[assigneeId] ??= {
+        assigneeName: file.assigneeName ?? "Family Documents",
+        files: [],
+      };
       groups[assigneeId].files.push(file);
     });
 
