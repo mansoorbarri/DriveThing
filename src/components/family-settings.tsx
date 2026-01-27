@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { Modal } from "./ui/modal";
 import { Button } from "./ui/button";
-import { CopyIcon, CheckIcon, TrashIcon, FamilyIcon } from "./icons";
+import { CopyIcon, CheckIcon, TrashIcon } from "./icons";
 import { cn } from "~/lib/utils";
 
 interface FamilySettingsProps {
@@ -142,10 +143,12 @@ export function FamilySettings({
                     className="flex items-center gap-3 rounded-lg bg-gray-50 p-3"
                   >
                     {member.imageUrl ? (
-                      <img
+                      <Image
                         src={member.imageUrl}
                         alt=""
-                        className="h-10 w-10 rounded-full"
+                        width={40}
+                        height={40}
+                        className="rounded-full"
                       />
                     ) : (
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-gray-600">

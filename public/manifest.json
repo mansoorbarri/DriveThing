@@ -1,6 +1,6 @@
 {
-  "name": "Family Drive",
-  "short_name": "Family Drive",
+  "name": "DriveThing",
+  "short_name": "DriveThing",
   "description": "Simple file storage for your family",
   "start_url": "/dashboard",
   "display": "standalone",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
@@ -124,10 +125,12 @@ export function FileCard({
         {/* Image preview or icon */}
         {isImage && !imageError ? (
           <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
-            <img
+            <Image
               src={url}
               alt={name}
-              className="h-full w-full object-cover"
+              fill
+              className="object-cover"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               onError={() => setImageError(true)}
             />
           </div>

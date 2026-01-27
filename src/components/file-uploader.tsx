@@ -8,7 +8,7 @@ import { useUser } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
 import { cn } from "~/lib/utils";
 import { formatFileSize } from "~/lib/utils";
-import { UploadIcon, CheckIcon, CloseIcon } from "./icons";
+import { UploadIcon, CheckIcon } from "./icons";
 
 interface FileUploaderProps {
   onClose?: () => void;
@@ -82,8 +82,8 @@ export function FileUploader({ onClose }: FileUploaderProps) {
     },
   });
 
-  const onDrop = useCallback(
-    async (acceptedFiles: File[]) => {
+  const handleDrop = useCallback(
+    (acceptedFiles: File[]) => {
       if (acceptedFiles.length === 0) return;
 
       // Add files to state
@@ -96,14 +96,14 @@ export function FileUploader({ onClose }: FileUploaderProps) {
         })),
       ]);
 
-      // Start upload
-      await startUpload(acceptedFiles);
+      // Start upload (fire and forget)
+      void startUpload(acceptedFiles);
     },
     [startUpload]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
+    onDrop: handleDrop,
     accept: {
       "application/pdf": [".pdf"],
       "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp"],

@@ -5,7 +5,7 @@ import { Geist } from "next/font/google";
 import { Providers } from "~/components/providers";
 
 export const metadata: Metadata = {
-  title: "Family Drive",
+  title: "DriveThing",
   description: "Simple file storage for your family",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
   manifest: "/manifest.json",

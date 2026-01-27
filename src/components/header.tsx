@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { UserButton } from "@clerk/nextjs";
-import { SearchIcon, SettingsIcon, MenuIcon, CloseIcon } from "./icons";
+import { SearchIcon, SettingsIcon, CloseIcon } from "./icons";
 import { cn } from "~/lib/utils";
 
 interface HeaderProps {
@@ -26,10 +26,10 @@ export function Header({
         {/* Logo / Family name */}
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 font-bold text-white">
-            F
+            D
           </div>
           <span className="hidden font-semibold text-gray-900 sm:block">
-            {familyName ?? "Family Drive"}
+            {familyName ?? "DriveThing"}
           </span>
         </div>
 

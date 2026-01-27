@@ -14,10 +14,10 @@ export default async function Home() {
       {/* Hero section */}
       <div className="flex flex-1 flex-col items-center justify-center px-4 py-16 text-center">
         <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-2xl font-bold text-white">
-          F
+          D
         </div>
         <h1 className="mb-4 text-4xl font-bold text-gray-900 sm:text-5xl">
-          Family Drive
+          DriveThing
         </h1>
         <p className="mb-8 max-w-md text-lg text-gray-600">
           A simple way to store and share files with your family. No complicated
@@ -121,7 +121,7 @@ export default async function Home() {
 
       {/* Footer */}
       <footer className="border-t border-gray-200 px-4 py-6 text-center text-sm text-gray-500">
-        Family Drive - Simple file storage for families
+        DriveThing - Simple file storage for families
       </footer>
     </main>
   );

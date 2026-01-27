@@ -7,9 +7,7 @@ import { useAuth } from "@clerk/nextjs";
 import { type ReactNode } from "react";
 import { ToastProvider } from "./ui/toast";
 
-const convex = new ConvexReactClient(
-  process.env.NEXT_PUBLIC_CONVEX_URL as string
-);
+const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 export function Providers({ children }: { children: ReactNode }) {
   return (

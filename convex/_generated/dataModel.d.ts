@@ -1,56 +1,60 @@
 /* eslint-disable */
 /**
- * Generated data model types - placeholder until `convex dev` is run
- * This file will be overwritten when you run `convex dev`
+ * Generated data model types.
+ *
+ * THIS CODE IS AUTOMATICALLY GENERATED.
+ *
+ * To regenerate, run `npx convex dev`.
+ * @module
  */
 
-export type Id<T extends string> = string & { __tableName: T };
+import type {
+  DataModelFromSchemaDefinition,
+  DocumentByName,
+  TableNamesInDataModel,
+  SystemTableNames,
+} from "convex/server";
+import type { GenericId } from "convex/values";
+import schema from "../schema.js";
 
-export type Doc<T extends "families" | "users" | "files" | "invites"> =
-  T extends "families"
-    ? {
-        _id: Id<"families">;
-        _creationTime: number;
-        name: string;
-        ownerId: string;
-        inviteCode: string;
-        createdAt: number;
-      }
-    : T extends "users"
-      ? {
-          _id: Id<"users">;
-          _creationTime: number;
-          clerkId: string;
-          email: string;
-          name: string;
-          imageUrl?: string;
-          familyId?: Id<"families">;
-          role?: "owner" | "member";
-          createdAt: number;
-        }
-      : T extends "files"
-        ? {
-            _id: Id<"files">;
-            _creationTime: number;
-            name: string;
-            url: string;
-            fileKey: string;
-            type: string;
-            size: number;
-            uploadedBy: Id<"users">;
-            familyId: Id<"families">;
-            sharedWithFamily: boolean;
-            createdAt: number;
-          }
-        : T extends "invites"
-          ? {
-              _id: Id<"invites">;
-              _creationTime: number;
-              familyId: Id<"families">;
-              email: string;
-              invitedBy: Id<"users">;
-              status: "pending" | "accepted" | "expired";
-              createdAt: number;
-              expiresAt: number;
-            }
-          : never;
+/**
+ * The names of all of your Convex tables.
+ */
+export type TableNames = TableNamesInDataModel<DataModel>;
+
+/**
+ * The type of a document stored in Convex.
+ *
+ * @typeParam TableName - A string literal type of the table name (like "users").
+ */
+export type Doc<TableName extends TableNames> = DocumentByName<
+  DataModel,
+  TableName
+>;
+
+/**
+ * An identifier for a document in Convex.
+ *
+ * Convex documents are uniquely identified by their `Id`, which is accessible
+ * on the `_id` field. To learn more, see [Document IDs](https://docs.convex.dev/using/document-ids).
+ *
+ * Documents can be loaded using `db.get(tableName, id)` in query and mutation functions.
+ *
+ * IDs are just strings at runtime, but this type can be used to distinguish them from other
+ * strings when type checking.
+ *
+ * @typeParam TableName - A string literal type of the table name (like "users").
+ */
+export type Id<TableName extends TableNames | SystemTableNames> =
+  GenericId<TableName>;
+
+/**
+ * A type describing your Convex data model.
+ *
+ * This type includes information about what tables you have, the type of
+ * documents stored in those tables, and the indexes defined on them.
+ *
+ * This type is used to parameterize methods like `queryGeneric` and
+ * `mutationGeneric` to make them type-safe.
+ */
+export type DataModel = DataModelFromSchemaDefinition<typeof schema>;

@@ -71,11 +71,13 @@ export const getSharedFiles = query({
       return [];
     }
 
+    const familyId = user.familyId;
+
     // Get all shared files in the family (excluding user's own)
     const files = await ctx.db
       .query("files")
       .withIndex("by_family_shared", (q) =>
-        q.eq("familyId", user.familyId).eq("sharedWithFamily", true)
+        q.eq("familyId", familyId).eq("sharedWithFamily", true)
       )
       .order("desc")
       .collect();
@@ -214,10 +216,11 @@ export const searchFiles = query({
     // Get shared files if in a family
     let sharedFiles: typeof myFiles = [];
     if (user.familyId) {
+      const familyId = user.familyId;
       sharedFiles = await ctx.db
         .query("files")
         .withIndex("by_family_shared", (q) =>
-          q.eq("familyId", user.familyId).eq("sharedWithFamily", true)
+          q.eq("familyId", familyId).eq("sharedWithFamily", true)
         )
         .collect();
       sharedFiles = sharedFiles.filter((f) => f.uploadedBy !== user._id);
