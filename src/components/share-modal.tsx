@@ -96,7 +96,7 @@ export function ShareModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Share file">
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-zinc-400">
           Choose who can see &ldquo;{fileName}&rdquo;
         </p>
 
@@ -106,8 +106,8 @@ export function ShareModal({
           className={cn(
             "flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-colors",
             shareWithAll
-              ? "border-blue-500 bg-blue-50"
-              : "border-gray-200 hover:bg-gray-50"
+              ? "border-blue-500 bg-blue-500/10"
+              : "border-zinc-700 hover:bg-zinc-800"
           )}
         >
           <div
@@ -115,24 +115,24 @@ export function ShareModal({
               "flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium",
               shareWithAll
                 ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-600"
+                : "bg-zinc-800 text-zinc-400"
             )}
           >
             All
           </div>
           <div className="flex-1">
-            <p className="font-medium text-gray-900">Everyone in family</p>
-            <p className="text-sm text-gray-500">
+            <p className="font-medium text-zinc-100">Everyone in family</p>
+            <p className="text-sm text-zinc-500">
               All {familyMembers.length} members can see this file
             </p>
           </div>
-          {shareWithAll && <CheckIcon className="h-5 w-5 text-blue-600" />}
+          {shareWithAll && <CheckIcon className="h-5 w-5 text-blue-400" />}
         </button>
 
         {/* Individual members */}
         {!shareWithAll && otherMembers.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
               Or share with specific people
             </p>
             {otherMembers.map((member) => {
@@ -144,8 +144,8 @@ export function ShareModal({
                   className={cn(
                     "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
                     isSelected
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200 hover:bg-gray-50"
+                      ? "border-blue-500 bg-blue-500/10"
+                      : "border-zinc-700 hover:bg-zinc-800"
                   )}
                 >
                   <div
@@ -153,20 +153,20 @@ export function ShareModal({
                       "flex h-9 w-9 items-center justify-center rounded-full text-sm font-medium",
                       isSelected
                         ? "bg-blue-600 text-white"
-                        : "bg-gray-100 text-gray-600"
+                        : "bg-zinc-800 text-zinc-400"
                     )}
                   >
                     {member.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">
+                    <p className="font-medium text-zinc-100 truncate">
                       {member.name}
                     </p>
-                    <p className="text-sm text-gray-500 truncate">
+                    <p className="text-sm text-zinc-500 truncate">
                       {member.email}
                     </p>
                   </div>
-                  {isSelected && <CheckIcon className="h-5 w-5 text-blue-600" />}
+                  {isSelected && <CheckIcon className="h-5 w-5 text-blue-400" />}
                 </button>
               );
             })}
@@ -175,7 +175,7 @@ export function ShareModal({
 
         {/* Not shared indicator */}
         {!isShared && (
-          <p className="rounded-lg bg-gray-50 p-3 text-center text-sm text-gray-500">
+          <p className="rounded-lg bg-zinc-800/50 p-3 text-center text-sm text-zinc-500">
             This file is private - only you can see it
           </p>
         )}

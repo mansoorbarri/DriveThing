@@ -59,24 +59,30 @@ export default function DashboardPage() {
   const filteredMyFiles = useMemo(() => {
     if (!myFiles) return [];
     if (!searchQuery) return myFiles;
-    return myFiles.filter((f) =>
-      f.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const term = searchQuery.toLowerCase();
+    return myFiles.filter(
+      (f) =>
+        f.name.toLowerCase().includes(term) ||
+        f.tags?.some((tag) => tag.toLowerCase().includes(term))
     );
   }, [myFiles, searchQuery]);
 
   const filteredSharedFiles = useMemo(() => {
     if (!sharedFiles) return [];
     if (!searchQuery) return sharedFiles;
-    return sharedFiles.filter((f) =>
-      f.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const term = searchQuery.toLowerCase();
+    return sharedFiles.filter(
+      (f) =>
+        f.name.toLowerCase().includes(term) ||
+        f.tags?.some((tag) => tag.toLowerCase().includes(term))
     );
   }, [sharedFiles, searchQuery]);
 
   // Loading state
   if (!isLoaded || userWithFamily === undefined) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0a0b]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
       </div>
     );
   }
@@ -84,7 +90,7 @@ export default function DashboardPage() {
   // Not in a family yet - show setup
   if (!userWithFamily?.family) {
     return (
-      <main className="min-h-screen bg-gray-50">
+      <main className="min-h-screen bg-[#0a0a0b]">
         <FamilySetup />
       </main>
     );
@@ -92,9 +98,10 @@ export default function DashboardPage() {
 
   const { family, members } = userWithFamily;
   const currentUser = userWithFamily.user;
+  const isOwner = currentUser?.role === "owner";
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0a0a0b]">
       <Header
         familyName={family.name}
         searchQuery={searchQuery}
@@ -104,19 +111,19 @@ export default function DashboardPage() {
 
       <main className="mx-auto max-w-5xl px-4 py-6">
         {/* Tabs */}
-        <div className="mb-6 flex gap-1 rounded-lg bg-gray-100 p-1">
+        <div className="mb-6 flex gap-1 rounded-lg bg-zinc-900 p-1">
           <button
             onClick={() => setActiveTab("my-files")}
             className={cn(
               "flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors",
               activeTab === "my-files"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-600 hover:text-gray-900"
+                ? "bg-zinc-800 text-zinc-100 shadow-sm"
+                : "text-zinc-400 hover:text-zinc-200"
             )}
           >
-            My Files
+            {isOwner ? "All Files" : "My Files"}
             {myFiles && myFiles.length > 0 && (
-              <span className="ml-1.5 text-gray-400">({myFiles.length})</span>
+              <span className="ml-1.5 text-zinc-500">({myFiles.length})</span>
             )}
           </button>
           <button
@@ -124,13 +131,13 @@ export default function DashboardPage() {
             className={cn(
               "flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors",
               activeTab === "shared"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-600 hover:text-gray-900"
+                ? "bg-zinc-800 text-zinc-100 shadow-sm"
+                : "text-zinc-400 hover:text-zinc-200"
             )}
           >
             Shared with me
             {sharedFiles && sharedFiles.length > 0 && (
-              <span className="ml-1.5 text-gray-400">
+              <span className="ml-1.5 text-zinc-500">
                 ({sharedFiles.length})
               </span>
             )}
@@ -149,13 +156,16 @@ export default function DashboardPage() {
                 description={
                   searchQuery
                     ? "Try a different search term"
-                    : "Upload your first file to get started"
+                    : isOwner
+                      ? "Upload your first file to get started"
+                      : "Files assigned to you will appear here"
                 }
                 action={
-                  !searchQuery && (
+                  !searchQuery &&
+                  isOwner && (
                     <button
                       onClick={() => setShowUploader(true)}
-                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
+                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-500"
                     >
                       <UploadIcon className="h-5 w-5" />
                       Upload files
@@ -176,7 +186,9 @@ export default function DashboardPage() {
                     createdAt={file.createdAt}
                     sharedWithFamily={file.sharedWithFamily}
                     sharedWith={file.sharedWith ?? []}
-                    isOwner={true}
+                    tags={file.tags ?? []}
+                    assigneeName={file.assigneeName}
+                    isOwner={isOwner}
                     familyMembers={members}
                   />
                 ))}
@@ -212,6 +224,8 @@ export default function DashboardPage() {
                     createdAt={file.createdAt}
                     sharedWithFamily={file.sharedWithFamily}
                     sharedWith={file.sharedWith ?? []}
+                    tags={file.tags ?? []}
+                    assigneeName={file.assigneeName}
                     isOwner={false}
                     uploaderName={file.uploaderName}
                     familyMembers={members}
@@ -223,18 +237,20 @@ export default function DashboardPage() {
         )}
       </main>
 
-      {/* Floating upload button */}
-      <button
-        onClick={() => setShowUploader(true)}
-        className={cn(
-          "fixed bottom-6 right-6 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg",
-          "hover:bg-blue-700 active:bg-blue-800 transition-colors",
-          "md:bottom-8 md:right-8"
-        )}
-        aria-label="Upload files"
-      >
-        <PlusIcon className="h-6 w-6" />
-      </button>
+      {/* Floating upload button - only for owner */}
+      {isOwner && (
+        <button
+          onClick={() => setShowUploader(true)}
+          className={cn(
+            "fixed bottom-6 right-6 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg",
+            "hover:bg-blue-500 active:bg-blue-700 transition-colors",
+            "md:bottom-8 md:right-8"
+          )}
+          aria-label="Upload files"
+        >
+          <PlusIcon className="h-6 w-6" />
+        </button>
+      )}
 
       {/* Upload modal */}
       <Modal
@@ -242,7 +258,10 @@ export default function DashboardPage() {
         onClose={() => setShowUploader(false)}
         title="Upload files"
       >
-        <FileUploader onClose={() => setShowUploader(false)} />
+        <FileUploader
+          onClose={() => setShowUploader(false)}
+          familyMembers={members}
+        />
       </Modal>
 
       {/* Settings modal */}

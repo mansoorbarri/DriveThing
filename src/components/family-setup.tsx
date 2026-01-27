@@ -61,11 +61,11 @@ export function FamilySetup() {
     return (
       <div className="mx-auto max-w-md px-4 py-12">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
-            <FamilyIcon className="h-8 w-8 text-blue-600" />
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/20">
+            <FamilyIcon className="h-8 w-8 text-blue-400" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Welcome!</h1>
-          <p className="mt-2 text-gray-600">
+          <h1 className="text-2xl font-bold text-zinc-100">Welcome!</h1>
+          <p className="mt-2 text-zinc-400">
             Create a new family or join an existing one to start storing files.
           </p>
         </div>
@@ -73,14 +73,14 @@ export function FamilySetup() {
         <div className="space-y-3">
           <button
             onClick={() => setMode("create")}
-            className="flex w-full items-center gap-4 rounded-xl border border-gray-200 p-4 text-left transition-colors hover:bg-gray-50"
+            className="flex w-full items-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-colors hover:bg-zinc-800"
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
-              <PlusIcon className="h-6 w-6 text-blue-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/20">
+              <PlusIcon className="h-6 w-6 text-blue-400" />
             </div>
             <div>
-              <p className="font-medium text-gray-900">Create a family</p>
-              <p className="text-sm text-gray-500">
+              <p className="font-medium text-zinc-100">Create a family</p>
+              <p className="text-sm text-zinc-500">
                 Start a new family and invite others
               </p>
             </div>
@@ -88,14 +88,14 @@ export function FamilySetup() {
 
           <button
             onClick={() => setMode("join")}
-            className="flex w-full items-center gap-4 rounded-xl border border-gray-200 p-4 text-left transition-colors hover:bg-gray-50"
+            className="flex w-full items-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-colors hover:bg-zinc-800"
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-              <FamilyIcon className="h-6 w-6 text-green-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500/20">
+              <FamilyIcon className="h-6 w-6 text-green-400" />
             </div>
             <div>
-              <p className="font-medium text-gray-900">Join a family</p>
-              <p className="text-sm text-gray-500">
+              <p className="font-medium text-zinc-100">Join a family</p>
+              <p className="text-sm text-zinc-500">
                 Enter an invite code to join
               </p>
             </div>
@@ -113,15 +113,15 @@ export function FamilySetup() {
             setMode("choose");
             setError("");
           }}
-          className="mb-6 text-sm text-gray-500 hover:text-gray-700"
+          className="mb-6 text-sm text-zinc-500 hover:text-zinc-300"
         >
           &larr; Back
         </button>
 
-        <h1 className="mb-2 text-2xl font-bold text-gray-900">
+        <h1 className="mb-2 text-2xl font-bold text-zinc-100">
           Create your family
         </h1>
-        <p className="mb-6 text-gray-600">
+        <p className="mb-6 text-zinc-400">
           Choose a name for your family. You can invite others after.
         </p>
 
@@ -150,13 +150,13 @@ export function FamilySetup() {
           setMode("choose");
           setError("");
         }}
-        className="mb-6 text-sm text-gray-500 hover:text-gray-700"
+        className="mb-6 text-sm text-zinc-500 hover:text-zinc-300"
       >
         &larr; Back
       </button>
 
-      <h1 className="mb-2 text-2xl font-bold text-gray-900">Join a family</h1>
-      <p className="mb-6 text-gray-600">
+      <h1 className="mb-2 text-2xl font-bold text-zinc-100">Join a family</h1>
+      <p className="mb-6 text-zinc-400">
         Enter the 6-character invite code you received.
       </p>
 

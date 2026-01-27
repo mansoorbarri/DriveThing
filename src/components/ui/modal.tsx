@@ -41,7 +41,7 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -49,7 +49,7 @@ export function Modal({
       {/* Modal content */}
       <div
         className={cn(
-          "relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl",
+          "relative w-full max-w-md rounded-xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl",
           "animate-in fade-in zoom-in-95 duration-200",
           className
         )}
@@ -59,12 +59,12 @@ export function Modal({
       >
         {title && (
           <div className="mb-4 flex items-center justify-between">
-            <h2 id="modal-title" className="text-xl font-semibold text-gray-900">
+            <h2 id="modal-title" className="text-xl font-semibold text-zinc-100">
               {title}
             </h2>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
               aria-label="Close"
             >
               <svg

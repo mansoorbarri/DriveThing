@@ -3,11 +3,28 @@
 @theme {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  /* Dark mode color palette */
+  --color-dark-bg: #0a0a0b;
+  --color-dark-surface: #141416;
+  --color-dark-surface-2: #1c1c1f;
+  --color-dark-surface-3: #252528;
+  --color-dark-border: #2a2a2d;
+  --color-dark-border-light: #3a3a3d;
+  --color-dark-text: #fafafa;
+  --color-dark-text-secondary: #a1a1aa;
+  --color-dark-text-muted: #71717a;
 }
 
-/* Smooth scrolling */
+/* Dark mode base */
 html {
   scroll-behavior: smooth;
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-dark-bg);
+  color: var(--color-dark-text);
 }
 
 /* Better tap targets on mobile */
@@ -88,4 +105,23 @@ html {
 /* Remove default focus outline when not using keyboard */
 :focus:not(:focus-visible) {
   outline: none;
+}
+
+/* Custom scrollbar for dark mode */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-dark-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-dark-border-light);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-dark-text-muted);
 }

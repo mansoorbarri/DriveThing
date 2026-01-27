@@ -9,7 +9,7 @@ interface SkeletonProps {
 export function Skeleton({ className }: SkeletonProps) {
   return (
     <div
-      className={cn("animate-pulse rounded-lg bg-gray-200", className)}
+      className={cn("animate-pulse rounded-lg bg-zinc-800", className)}
       aria-hidden="true"
     />
   );
@@ -17,7 +17,7 @@ export function Skeleton({ className }: SkeletonProps) {
 
 export function FileCardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
       <Skeleton className="aspect-[4/3] w-full rounded-none" />
       <div className="p-4">
         <Skeleton className="mb-2 h-5 w-3/4" />

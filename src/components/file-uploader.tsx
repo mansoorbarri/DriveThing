@@ -7,26 +7,39 @@ import { useUploadThing } from "~/lib/uploadthing-hooks";
 import { useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { cn } from "~/lib/utils";
 import { formatFileSize } from "~/lib/utils";
-import { UploadIcon, CheckIcon } from "./icons";
+import { UploadIcon, CheckIcon, CloseIcon } from "./icons";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 
+interface FamilyMember {
+  _id: Id<"users">;
+  name: string;
+  email: string;
+  role?: "owner" | "member";
+}
+
 interface FileUploaderProps {
   onClose?: () => void;
+  familyMembers: FamilyMember[];
 }
 
 interface PendingFile {
   file: File;
   customName: string;
   originalName: string;
+  assignedTo?: Id<"users">;
+  tags: string[];
 }
 
 interface UploadingFile {
   file: File;
   customName: string;
   originalName: string;
+  assignedTo?: Id<"users">;
+  tags: string[];
   progress: number;
   status: "compressing" | "uploading" | "saving" | "done" | "error";
   error?: string;
@@ -66,12 +79,16 @@ async function compressImage(file: File): Promise<File> {
   }
 }
 
-export function FileUploader({ onClose }: FileUploaderProps) {
+export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
   const { user } = useUser();
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [tagInput, setTagInput] = useState<{ [key: number]: string }>({});
   const createFile = useMutation(api.files.createFile);
+
+  // Get non-owner members for assignment
+  const assignableMembers = familyMembers.filter((m) => m.role !== "owner");
 
   const { startUpload, isUploading } = useUploadThing("fileUploader", {
     onUploadProgress: (progress) => {
@@ -104,6 +121,8 @@ export function FileUploader({ onClose }: FileUploaderProps) {
             type: result.type,
             size: result.size,
             clerkId: user.id,
+            assignedTo: uploadingFile?.assignedTo,
+            tags: uploadingFile?.tags ?? [],
           });
 
           setUploadingFiles((prev) =>
@@ -141,6 +160,8 @@ export function FileUploader({ onClose }: FileUploaderProps) {
       file,
       customName: file.name.replace(/\.[^/.]+$/, ""), // Remove extension for display
       originalName: file.name,
+      assignedTo: undefined,
+      tags: [],
     }));
 
     setPendingFiles((prev) => [...prev, ...newPendingFiles]);
@@ -149,6 +170,34 @@ export function FileUploader({ onClose }: FileUploaderProps) {
   const updateFileName = (index: number, newName: string) => {
     setPendingFiles((prev) =>
       prev.map((f, i) => (i === index ? { ...f, customName: newName } : f))
+    );
+  };
+
+  const updateAssignee = (index: number, assignedTo?: Id<"users">) => {
+    setPendingFiles((prev) =>
+      prev.map((f, i) => (i === index ? { ...f, assignedTo } : f))
+    );
+  };
+
+  const addTag = (index: number, tag: string) => {
+    const trimmedTag = tag.trim().toLowerCase();
+    if (!trimmedTag) return;
+
+    setPendingFiles((prev) =>
+      prev.map((f, i) =>
+        i === index && !f.tags.includes(trimmedTag)
+          ? { ...f, tags: [...f.tags, trimmedTag] }
+          : f
+      )
+    );
+    setTagInput((prev) => ({ ...prev, [index]: "" }));
+  };
+
+  const removeTag = (index: number, tag: string) => {
+    setPendingFiles((prev) =>
+      prev.map((f, i) =>
+        i === index ? { ...f, tags: f.tags.filter((t) => t !== tag) } : f
+      )
     );
   };
 
@@ -173,6 +222,8 @@ export function FileUploader({ onClose }: FileUploaderProps) {
         file: pending.file,
         customName: formattedName,
         originalName: pending.originalName,
+        assignedTo: pending.assignedTo,
+        tags: pending.tags,
         progress: 0,
         status: "compressing",
       };
@@ -252,18 +303,18 @@ export function FileUploader({ onClose }: FileUploaderProps) {
           className={cn(
             "cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors",
             isDragActive
-              ? "border-blue-500 bg-blue-50"
-              : "border-gray-300 hover:border-gray-400 hover:bg-gray-50",
+              ? "border-blue-500 bg-blue-500/10"
+              : "border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800/50",
             (isUploading || isProcessing) && "cursor-not-allowed opacity-50"
           )}
         >
           <input {...getInputProps()} />
-          <UploadIcon className="mx-auto h-10 w-10 text-gray-400" />
-          <p className="mt-3 text-base font-medium text-gray-700">
+          <UploadIcon className="mx-auto h-10 w-10 text-zinc-500" />
+          <p className="mt-3 text-base font-medium text-zinc-200">
             {isDragActive ? "Drop files here" : "Drag and drop files here"}
           </p>
-          <p className="mt-1 text-sm text-gray-500">or tap to select files</p>
-          <p className="mt-3 text-xs text-gray-400">
+          <p className="mt-1 text-sm text-zinc-500">or tap to select files</p>
+          <p className="mt-3 text-xs text-zinc-600">
             PDF, images, and Excel files. Images over 1MB will be compressed.
           </p>
         </div>
@@ -272,36 +323,110 @@ export function FileUploader({ onClose }: FileUploaderProps) {
       {/* Pending files - name entry */}
       {pendingFiles.length > 0 && (
         <div className="space-y-4">
-          <p className="text-sm font-medium text-gray-700">
-            Name your files (e.g., &quot;National Insurance&quot;, &quot;Passport
-            Scan&quot;)
+          <p className="text-sm font-medium text-zinc-300">
+            Name your files and assign to family members
           </p>
           {pendingFiles.map((pending, index) => (
-            <div key={index} className="rounded-lg border border-gray-200 p-4">
+            <div
+              key={index}
+              className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4"
+            >
               <div className="mb-3 flex items-center justify-between">
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-zinc-500">
                   {pending.originalName} ({formatFileSize(pending.file.size)})
                 </span>
                 <button
                   onClick={() => removePendingFile(index)}
-                  className="text-xs text-red-600 hover:text-red-700"
+                  className="text-xs text-red-400 hover:text-red-300"
                 >
                   Remove
                 </button>
               </div>
+
+              {/* File name */}
               <Input
                 placeholder="What is this file?"
                 value={pending.customName}
                 onChange={(e) => updateFileName(index, e.target.value)}
                 autoFocus={index === 0}
               />
-              <p className="mt-1.5 text-xs text-gray-400">
+              <p className="mt-1.5 text-xs text-zinc-600">
                 Will be saved as:{" "}
                 {formatFileName(
                   pending.customName,
                   getExtension(pending.originalName)
                 )}
               </p>
+
+              {/* Assign to member */}
+              {assignableMembers.length > 0 && (
+                <div className="mt-4">
+                  <label className="mb-1.5 block text-sm font-medium text-zinc-400">
+                    Assign to (optional)
+                  </label>
+                  <select
+                    value={pending.assignedTo ?? ""}
+                    onChange={(e) =>
+                      updateAssignee(
+                        index,
+                        e.target.value
+                          ? (e.target.value as Id<"users">)
+                          : undefined
+                      )
+                    }
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    <option value="">No one (family documents)</option>
+                    {assignableMembers.map((member) => (
+                      <option key={member._id} value={member._id}>
+                        {member.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Tags */}
+              <div className="mt-4">
+                <label className="mb-1.5 block text-sm font-medium text-zinc-400">
+                  Tags (optional)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {pending.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 rounded-full bg-blue-500/20 px-2.5 py-1 text-xs font-medium text-blue-400"
+                    >
+                      {tag}
+                      <button
+                        onClick={() => removeTag(index, tag)}
+                        className="hover:text-blue-200"
+                      >
+                        <CloseIcon className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    placeholder="Add tag..."
+                    value={tagInput[index] ?? ""}
+                    onChange={(e) =>
+                      setTagInput((prev) => ({ ...prev, [index]: e.target.value }))
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === ",") {
+                        e.preventDefault();
+                        addTag(index, tagInput[index] ?? "");
+                      }
+                    }}
+                    onBlur={() => addTag(index, tagInput[index] ?? "")}
+                    className="min-w-[100px] flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-zinc-600">
+                  Press Enter or comma to add tags
+                </p>
+              </div>
             </div>
           ))}
 
@@ -329,7 +454,7 @@ export function FileUploader({ onClose }: FileUploaderProps) {
           {/* Add more files */}
           <div
             {...getRootProps()}
-            className="cursor-pointer rounded-lg border border-dashed border-gray-300 p-3 text-center text-sm text-gray-500 hover:bg-gray-50"
+            className="cursor-pointer rounded-lg border border-dashed border-zinc-700 p-3 text-center text-sm text-zinc-500 hover:bg-zinc-800/50"
           >
             <input {...getInputProps()} />
             + Add more files
@@ -343,36 +468,36 @@ export function FileUploader({ onClose }: FileUploaderProps) {
           {uploadingFiles.map((f, i) => (
             <div
               key={i}
-              className="flex items-center gap-3 rounded-lg bg-gray-50 p-3"
+              className="flex items-center gap-3 rounded-lg bg-zinc-800/50 p-3"
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-gray-900">
+                <p className="truncate text-sm font-medium text-zinc-100">
                   {f.customName}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-zinc-500">
                   {formatFileSize(f.file.size)}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 {f.status === "compressing" && (
-                  <span className="text-xs text-gray-500">Compressing...</span>
+                  <span className="text-xs text-zinc-500">Compressing...</span>
                 )}
                 {f.status === "uploading" && (
-                  <div className="h-2 w-16 overflow-hidden rounded-full bg-gray-200">
+                  <div className="h-2 w-16 overflow-hidden rounded-full bg-zinc-700">
                     <div
-                      className="h-full bg-blue-600 transition-all"
+                      className="h-full bg-blue-500 transition-all"
                       style={{ width: `${f.progress}%` }}
                     />
                   </div>
                 )}
                 {f.status === "saving" && (
-                  <span className="text-xs text-gray-500">Saving...</span>
+                  <span className="text-xs text-zinc-500">Saving...</span>
                 )}
                 {f.status === "done" && (
-                  <CheckIcon className="h-5 w-5 text-green-600" />
+                  <CheckIcon className="h-5 w-5 text-green-500" />
                 )}
                 {f.status === "error" && (
-                  <span className="text-xs text-red-600">{f.error}</span>
+                  <span className="text-xs text-red-400">{f.error}</span>
                 )}
               </div>
             </div>
@@ -389,7 +514,7 @@ export function FileUploader({ onClose }: FileUploaderProps) {
 
       {/* Uploading indicator */}
       {hasUploading && (
-        <p className="text-center text-sm text-gray-500">
+        <p className="text-center text-sm text-zinc-500">
           Please wait while your files are being uploaded...
         </p>
       )}

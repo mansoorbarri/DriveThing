@@ -86,28 +86,28 @@ export function FamilySettings({
         <div className="space-y-6">
           {/* Family name */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-zinc-400">
               Family name
             </label>
-            <p className="text-lg font-semibold text-gray-900">{family.name}</p>
+            <p className="text-lg font-semibold text-zinc-100">{family.name}</p>
           </div>
 
           {/* Invite code */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-zinc-400">
               Invite code
             </label>
             <div className="flex items-center gap-2">
-              <div className="flex-1 rounded-lg bg-gray-100 px-4 py-3 font-mono text-lg tracking-widest text-gray-900">
+              <div className="flex-1 rounded-lg bg-zinc-800 px-4 py-3 font-mono text-lg tracking-widest text-zinc-100">
                 {family.inviteCode}
               </div>
               <button
                 onClick={copyInviteCode}
-                className="rounded-lg p-3 text-gray-500 hover:bg-gray-100"
+                className="rounded-lg p-3 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
                 aria-label="Copy invite code"
               >
                 {copied ? (
-                  <CheckIcon className="h-5 w-5 text-green-600" />
+                  <CheckIcon className="h-5 w-5 text-green-500" />
                 ) : (
                   <CopyIcon className="h-5 w-5" />
                 )}
@@ -117,19 +117,19 @@ export function FamilySettings({
               <button
                 onClick={handleRegenerate}
                 disabled={regenerating}
-                className="mt-2 text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                className="mt-2 text-sm text-blue-400 hover:text-blue-300 disabled:opacity-50"
               >
                 {regenerating ? "Generating..." : "Generate new code"}
               </button>
             )}
-            <p className="mt-2 text-xs text-gray-500">
+            <p className="mt-2 text-xs text-zinc-500">
               Share this code with family members so they can join.
             </p>
           </div>
 
           {/* Members list */}
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
+            <label className="mb-2 block text-sm font-medium text-zinc-400">
               Members ({members.length})
             </label>
             <div className="space-y-2">
@@ -140,7 +140,7 @@ export function FamilySettings({
                 return (
                   <div
                     key={member._id}
-                    className="flex items-center gap-3 rounded-lg bg-gray-50 p-3"
+                    className="flex items-center gap-3 rounded-lg bg-zinc-800/50 p-3"
                   >
                     {member.imageUrl ? (
                       <Image
@@ -151,20 +151,20 @@ export function FamilySettings({
                         className="rounded-full"
                       />
                     ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-gray-600">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-700 text-zinc-300">
                         {member.name[0]?.toUpperCase()}
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-gray-900">
+                      <p className="truncate font-medium text-zinc-100">
                         {member.name}
                         {isSelf && (
-                          <span className="ml-1 text-sm text-gray-500">
+                          <span className="ml-1 text-sm text-zinc-500">
                             (you)
                           </span>
                         )}
                       </p>
-                      <p className="truncate text-sm text-gray-500">
+                      <p className="truncate text-sm text-zinc-500">
                         {memberIsOwner ? "Owner" : "Member"}
                       </p>
                     </div>
@@ -173,7 +173,7 @@ export function FamilySettings({
                         onClick={() => handleRemoveMember(member._id)}
                         disabled={removingMember === member._id}
                         className={cn(
-                          "rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600",
+                          "rounded-lg p-2 text-zinc-500 hover:bg-red-500/10 hover:text-red-400",
                           removingMember === member._id && "opacity-50"
                         )}
                         aria-label="Remove member"
@@ -189,7 +189,7 @@ export function FamilySettings({
 
           {/* Leave family (for non-owners) */}
           {!isOwner && (
-            <div className="border-t border-gray-200 pt-4">
+            <div className="border-t border-zinc-800 pt-4">
               <Button
                 variant="danger"
                 onClick={() => setShowLeaveConfirm(true)}
@@ -208,7 +208,7 @@ export function FamilySettings({
         onClose={() => setShowLeaveConfirm(false)}
         title="Leave family?"
       >
-        <p className="mb-6 text-gray-600">
+        <p className="mb-6 text-zinc-400">
           Are you sure you want to leave &ldquo;{family.name}&rdquo;? Your files
           will be deleted.
         </p>

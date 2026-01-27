@@ -33,8 +33,11 @@ export default defineSchema({
     fileKey: v.string(), // UploadThing file key for deletion
     type: v.string(), // MIME type
     size: v.number(), // bytes
-    uploadedBy: v.id("users"),
+    uploadedBy: v.id("users"), // Who uploaded (always owner)
+    assignedTo: v.optional(v.id("users")), // Which family member this belongs to
     familyId: v.id("families"),
+    // Tags for organization
+    tags: v.optional(v.array(v.string())),
     // Sharing options
     sharedWithFamily: v.boolean(), // if true, all family members can see
     sharedWith: v.optional(v.array(v.id("users"))), // specific users to share with
@@ -42,6 +45,7 @@ export default defineSchema({
   })
     .index("by_uploader", ["uploadedBy"])
     .index("by_family", ["familyId"])
+    .index("by_assigned", ["assignedTo"])
     .index("by_family_shared", ["familyId", "sharedWithFamily"]),
 
   // Pending invites - for tracking sent invitations
@@ -59,4 +63,12 @@ export default defineSchema({
   })
     .index("by_family", ["familyId"])
     .index("by_email", ["email"]),
+
+  // Tags - predefined tags for the family
+  tags: defineTable({
+    name: v.string(),
+    color: v.string(), // Hex color
+    familyId: v.id("families"),
+    createdAt: v.number(),
+  }).index("by_family", ["familyId"]),
 });
