@@ -25,6 +25,22 @@ export default defineSchema({
     .index("by_clerk_id", ["clerkId"])
     .index("by_family", ["familyId"]),
 
+  // Folders - for organizing files
+  folders: defineTable({
+    name: v.string(),
+    parentFolderId: v.optional(v.id("folders")), // For nesting
+    createdBy: v.id("users"),
+    assignedTo: v.optional(v.id("users")),
+    familyId: v.id("families"),
+    sharedWithFamily: v.boolean(),
+    sharedWith: v.optional(v.array(v.id("users"))),
+    createdAt: v.number(),
+  })
+    .index("by_family", ["familyId"])
+    .index("by_assigned", ["assignedTo"])
+    .index("by_parent", ["parentFolderId"])
+    .index("by_family_shared", ["familyId", "sharedWithFamily"]),
+
   // Files - stored file metadata
   files: defineTable({
     name: v.string(),
@@ -36,6 +52,7 @@ export default defineSchema({
     uploadedBy: v.id("users"), // Who uploaded (always owner)
     assignedTo: v.optional(v.id("users")), // Which family member this belongs to
     familyId: v.id("families"),
+    folderId: v.optional(v.id("folders")), // Which folder this file is in
     // Tags for organization
     tags: v.optional(v.array(v.string())),
     // Sharing options
@@ -46,7 +63,8 @@ export default defineSchema({
     .index("by_uploader", ["uploadedBy"])
     .index("by_family", ["familyId"])
     .index("by_assigned", ["assignedTo"])
-    .index("by_family_shared", ["familyId", "sharedWithFamily"]),
+    .index("by_family_shared", ["familyId", "sharedWithFamily"])
+    .index("by_folder", ["folderId"]),
 
   // Pending invites - for tracking sent invitations
   invites: defineTable({

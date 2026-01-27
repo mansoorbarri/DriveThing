@@ -10,6 +10,7 @@
 
 import type * as families from "../families.js";
 import type * as files from "../files.js";
+import type * as folders from "../folders.js";
 import type * as users from "../users.js";
 
 import type {
@@ -21,6 +22,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   families: typeof families;
   files: typeof files;
+  folders: typeof folders;
   users: typeof users;
 }>;
 

@@ -13,6 +13,7 @@ export const createFile = mutation({
     clerkId: v.string(),
     assignedTo: v.optional(v.id("users")),
     tags: v.optional(v.array(v.string())),
+    folderId: v.optional(v.id("folders")),
   },
   handler: async (ctx, args) => {
     const user = await ctx.db
@@ -29,6 +30,14 @@ export const createFile = mutation({
       throw new Error("Only family owners can upload files");
     }
 
+    // Validate folder if provided
+    if (args.folderId) {
+      const folder = await ctx.db.get(args.folderId);
+      if (!folder || folder.familyId !== user.familyId) {
+        throw new Error("Folder not found");
+      }
+    }
+
     return await ctx.db.insert("files", {
       name: args.name,
       originalName: args.originalName,
@@ -39,6 +48,7 @@ export const createFile = mutation({
       uploadedBy: user._id,
       assignedTo: args.assignedTo,
       familyId: user.familyId,
+      folderId: args.folderId,
       tags: args.tags ?? [],
       sharedWithFamily: false,
       sharedWith: [],
@@ -90,8 +100,13 @@ export const getAllFamilyFiles = query({
 // Get files for current user
 // - Owners see all files they uploaded
 // - Members see files assigned to them + unassigned family documents
+// - Can filter by folder or get only root files
 export const getMyFiles = query({
-  args: { clerkId: v.string() },
+  args: {
+    clerkId: v.string(),
+    folderId: v.optional(v.id("folders")),
+    rootOnly: v.optional(v.boolean()),
+  },
   handler: async (ctx, args) => {
     const user = await ctx.db
       .query("users")
@@ -104,12 +119,33 @@ export const getMyFiles = query({
 
     const familyId = user.familyId;
 
-    // Get all files in the family
-    const allFamilyFiles = await ctx.db
-      .query("files")
-      .withIndex("by_family", (q) => q.eq("familyId", familyId))
-      .order("desc")
-      .collect();
+    // Get files based on folder filter
+    let allFamilyFiles;
+    if (args.folderId) {
+      // Get files in specific folder
+      allFamilyFiles = await ctx.db
+        .query("files")
+        .withIndex("by_folder", (q) => q.eq("folderId", args.folderId))
+        .order("desc")
+        .collect();
+      // Filter to only files in user's family
+      allFamilyFiles = allFamilyFiles.filter((f) => f.familyId === familyId);
+    } else if (args.rootOnly) {
+      // Get files at root level (no folder)
+      const allFiles = await ctx.db
+        .query("files")
+        .withIndex("by_family", (q) => q.eq("familyId", familyId))
+        .order("desc")
+        .collect();
+      allFamilyFiles = allFiles.filter((f) => !f.folderId);
+    } else {
+      // Get all files in the family (legacy behavior)
+      allFamilyFiles = await ctx.db
+        .query("files")
+        .withIndex("by_family", (q) => q.eq("familyId", familyId))
+        .order("desc")
+        .collect();
+    }
 
     // Filter based on role
     let myFiles;
@@ -143,8 +179,13 @@ export const getMyFiles = query({
 });
 
 // Get files shared with the current user
+// Includes files in shared folders
 export const getSharedFiles = query({
-  args: { clerkId: v.string() },
+  args: {
+    clerkId: v.string(),
+    folderId: v.optional(v.id("folders")),
+    rootOnly: v.optional(v.boolean()),
+  },
   handler: async (ctx, args) => {
     const user = await ctx.db
       .query("users")
@@ -157,17 +198,48 @@ export const getSharedFiles = query({
 
     const familyId = user.familyId;
 
-    // Get all files in the family
-    const allFamilyFiles = await ctx.db
-      .query("files")
+    // Get all files based on folder filter
+    let allFamilyFiles;
+    if (args.folderId) {
+      allFamilyFiles = await ctx.db
+        .query("files")
+        .withIndex("by_folder", (q) => q.eq("folderId", args.folderId))
+        .order("desc")
+        .collect();
+      allFamilyFiles = allFamilyFiles.filter((f) => f.familyId === familyId);
+    } else if (args.rootOnly) {
+      const allFiles = await ctx.db
+        .query("files")
+        .withIndex("by_family", (q) => q.eq("familyId", familyId))
+        .order("desc")
+        .collect();
+      allFamilyFiles = allFiles.filter((f) => !f.folderId);
+    } else {
+      allFamilyFiles = await ctx.db
+        .query("files")
+        .withIndex("by_family", (q) => q.eq("familyId", familyId))
+        .order("desc")
+        .collect();
+    }
+
+    // Get shared folders to check for files inside shared folders
+    const allFolders = await ctx.db
+      .query("folders")
       .withIndex("by_family", (q) => q.eq("familyId", familyId))
-      .order("desc")
       .collect();
 
-    // Filter to files user can see:
-    // 1. Shared with whole family (and not assigned to them - they see those in My Files)
-    // 2. Specifically shared with this user (and not assigned to them)
-    // 3. Exclude unassigned files - everyone sees those in My Files
+    const sharedFolderIds = new Set(
+      allFolders
+        .filter((folder) => {
+          if (folder.createdBy === user._id) return false;
+          if (folder.assignedTo === user._id) return false;
+          if (!folder.assignedTo) return false;
+          return folder.sharedWithFamily || folder.sharedWith?.includes(user._id);
+        })
+        .map((f) => f._id)
+    );
+
+    // Filter to files user can see
     const visibleFiles = allFamilyFiles.filter((file) => {
       // Exclude unassigned files (family documents) - they appear in My Files for everyone
       if (!file.assignedTo) return false;
@@ -175,8 +247,11 @@ export const getSharedFiles = query({
       if (file.assignedTo === user._id) return false;
       // Exclude files uploaded by this user (owner sees in My Files)
       if (file.uploadedBy === user._id) return false;
+      // Include if file is shared
       if (file.sharedWithFamily) return true;
       if (file.sharedWith?.includes(user._id)) return true;
+      // Include if file is in a shared folder
+      if (file.folderId && sharedFolderIds.has(file.folderId)) return true;
       return false;
     });
 
@@ -462,5 +537,44 @@ export const getFamilyTags = query({
     });
 
     return Array.from(tagSet).sort();
+  },
+});
+
+// Move file to a different folder - OWNER ONLY
+export const moveFile = mutation({
+  args: {
+    fileId: v.id("files"),
+    folderId: v.optional(v.id("folders")),
+    clerkId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const file = await ctx.db.get(args.fileId);
+    if (!file) {
+      throw new Error("File not found");
+    }
+
+    // Only owner can move files
+    if (user.role !== "owner" || file.uploadedBy !== user._id) {
+      throw new Error("Not authorized to move this file");
+    }
+
+    // Validate target folder if provided
+    if (args.folderId) {
+      const folder = await ctx.db.get(args.folderId);
+      if (!folder || folder.familyId !== file.familyId) {
+        throw new Error("Target folder not found");
+      }
+    }
+
+    await ctx.db.patch(args.fileId, { folderId: args.folderId });
   },
 });

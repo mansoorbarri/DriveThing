@@ -1,33 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { cn } from "~/lib/utils";
 import {
-  cn,
-  formatFileSize,
-  formatDate,
-  getFileIcon,
-  shareFile,
-} from "~/lib/utils";
-import {
-  FileIcon,
-  ImageIcon,
-  PdfIcon,
-  SpreadsheetIcon,
+  FolderIcon,
   ShareIcon,
   TrashIcon,
-  DownloadIcon,
   MoreIcon,
   UserIcon,
+  EditIcon,
   MoveIcon,
 } from "./icons";
 import { Button } from "./ui/button";
 import { Modal } from "./ui/modal";
-import { ShareModal } from "./share-modal";
+import { Input } from "./ui/input";
 
 interface FamilyMember {
   _id: Id<"users">;
@@ -37,121 +27,82 @@ interface FamilyMember {
   role?: "owner" | "member";
 }
 
-interface FileCardProps {
-  id: Id<"files">;
+interface FolderCardProps {
+  id: Id<"folders">;
   name: string;
-  url: string;
-  type: string;
-  size: number;
-  createdAt: number;
   sharedWithFamily: boolean;
   sharedWith?: Id<"users">[];
-  tags?: string[];
   assignedTo?: Id<"users">;
   assigneeName?: string;
+  itemCount: number;
   isOwner: boolean;
-  uploaderName?: string;
   familyMembers?: FamilyMember[];
-  folderId?: Id<"folders">;
+  onClick: () => void;
   onMoveClick?: () => void;
 }
 
-export function FileCard({
+export function FolderCard({
   id,
   name,
-  url,
-  type,
-  size,
-  createdAt,
   sharedWithFamily,
   sharedWith = [],
-  tags = [],
   assignedTo,
   assigneeName,
+  itemCount,
   isOwner,
-  uploaderName,
   familyMembers = [],
+  onClick,
   onMoveClick,
-}: FileCardProps) {
+}: FolderCardProps) {
   const { user } = useUser();
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
   const [isReassigning, setIsReassigning] = useState(false);
-  const [shareStatus, setShareStatus] = useState<"idle" | "shared" | "copied">(
-    "idle"
-  );
-  const [imageError, setImageError] = useState(false);
+  const [isSharingUpdating, setIsSharingUpdating] = useState(false);
+  const [newName, setNewName] = useState(name);
+  const [deleteContents, setDeleteContents] = useState(false);
 
-  const deleteFile = useMutation(api.files.deleteFile);
-  const updateAssignment = useMutation(api.files.updateFileAssignment);
+  const deleteFolder = useMutation(api.folders.deleteFolder);
+  const renameFolder = useMutation(api.folders.renameFolder);
+  const updateAssignment = useMutation(api.folders.updateFolderAssignment);
+  const updateSharing = useMutation(api.folders.updateFolderSharing);
 
   // Get non-owner members for assignment
   const assignableMembers = familyMembers.filter((m) => m.role !== "owner");
 
-  // Check if current user can share this file (owner OR file is assigned to them)
+  // Check if current user can share this folder (owner OR folder is assigned to them)
   const currentUserEmail = user?.primaryEmailAddress?.emailAddress;
   const currentMember = familyMembers.find((m) => m.email === currentUserEmail);
   const isAssignedToMe = currentMember && assignedTo === currentMember._id;
   const canShare = isOwner || isAssignedToMe;
 
-  const fileIcon = getFileIcon(type);
-  const isImage = type.startsWith("image/");
-
-  const handleShare = async () => {
-    const canShare = typeof navigator !== "undefined" && "share" in navigator;
-    const shared = await shareFile(name, url);
-    if (shared) {
-      setShareStatus(canShare ? "shared" : "copied");
-      setTimeout(() => setShareStatus("idle"), 2000);
-    }
-    setShowMenu(false);
-  };
-
-  const handleOpenShareModal = () => {
-    setShowMenu(false);
-    setShowShareModal(true);
-  };
-
-  const handleOpenReassignModal = () => {
-    setShowMenu(false);
-    setShowReassignModal(true);
-  };
-
-  const handleReassign = async (newAssignee?: Id<"users">) => {
-    if (!user) return;
-    setIsReassigning(true);
-    try {
-      await updateAssignment({
-        fileId: id,
-        clerkId: user.id,
-        assignedTo: newAssignee,
-      });
-      setShowReassignModal(false);
-    } finally {
-      setIsReassigning(false);
-    }
-  };
-
-  // Check if file is shared with specific members (not whole family)
+  // Check if shared with specific members (not whole family)
   const isSharedWithSome = sharedWith.length > 0 && !sharedWithFamily;
 
   const handleDelete = async () => {
     if (!user) return;
     setIsDeleting(true);
     try {
-      // Delete from Convex DB and get the file key
-      const result = await deleteFile({ fileId: id, clerkId: user.id });
+      const result = await deleteFolder({
+        folderId: id,
+        deleteContents,
+        clerkId: user.id,
+      });
 
-      // Delete from UploadThing storage
-      if (result?.fileKey) {
-        await fetch("/api/uploadthing/delete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fileKey: result.fileKey }),
-        });
+      // Delete files from UploadThing if needed
+      if (result?.fileKeysToDelete?.length) {
+        for (const fileKey of result.fileKeysToDelete) {
+          await fetch("/api/uploadthing/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fileKey }),
+          });
+        }
       }
     } finally {
       setIsDeleting(false);
@@ -159,29 +110,56 @@ export function FileCard({
     }
   };
 
-  const handleDownload = () => {
-    window.open(url, "_blank");
-    setShowMenu(false);
+  const handleRename = async () => {
+    if (!user || !newName.trim()) return;
+    setIsRenaming(true);
+    try {
+      await renameFolder({
+        folderId: id,
+        newName: newName.trim(),
+        clerkId: user.id,
+      });
+      setShowRenameModal(false);
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
+  const handleReassign = async (newAssignee?: Id<"users">) => {
+    if (!user) return;
+    setIsReassigning(true);
+    try {
+      await updateAssignment({
+        folderId: id,
+        assignedTo: newAssignee,
+        clerkId: user.id,
+      });
+      setShowReassignModal(false);
+    } finally {
+      setIsReassigning(false);
+    }
+  };
+
+  const handleShareUpdate = async (shareWithFamily: boolean, shareWith: Id<"users">[]) => {
+    if (!user) return;
+    setIsSharingUpdating(true);
+    try {
+      await updateSharing({
+        folderId: id,
+        shareWithFamily,
+        sharedWith: shareWith,
+        clerkId: user.id,
+      });
+      setShowShareModal(false);
+    } finally {
+      setIsSharingUpdating(false);
+    }
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Don't open file if clicking menu button or dropdown
+    // Don't open folder if clicking menu button or dropdown
     if ((e.target as HTMLElement).closest("button")) return;
-    window.open(url, "_blank");
-  };
-
-  const IconComponent = {
-    image: ImageIcon,
-    pdf: PdfIcon,
-    spreadsheet: SpreadsheetIcon,
-    file: FileIcon,
-  }[fileIcon];
-
-  const iconColors = {
-    image: "text-purple-400 bg-purple-500/20",
-    pdf: "text-red-400 bg-red-500/20",
-    spreadsheet: "text-green-400 bg-green-500/20",
-    file: "text-violet-400 bg-violet-500/20",
+    onClick();
   };
 
   return (
@@ -190,41 +168,21 @@ export function FileCard({
         onClick={handleCardClick}
         className="group relative cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900 transition-all hover:border-zinc-700 hover:bg-zinc-800/50 active:bg-zinc-800"
       >
-        {/* Image preview or icon */}
-        {isImage && !imageError ? (
-          <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-800">
-            <Image
-              src={url}
-              alt={name}
-              fill
-              className="object-cover"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              onError={() => setImageError(true)}
-            />
-          </div>
-        ) : (
-          <div className="p-4 pb-0">
-            <div
-              className={cn(
-                "flex h-12 w-12 items-center justify-center rounded-lg",
-                iconColors[fileIcon]
-              )}
-            >
-              <IconComponent className="h-6 w-6" />
-            </div>
-          </div>
-        )}
-
-        {/* File info */}
         <div className="p-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400">
+            <FolderIcon className="h-6 w-6" />
+          </div>
+        </div>
+
+        <div className="p-4 pt-0">
           <h3 className="mb-1 truncate font-medium text-zinc-100" title={name}>
             {name}
           </h3>
 
           <div className="flex items-center gap-2 text-sm text-zinc-500">
-            <span>{formatFileSize(size)}</span>
-            <span className="text-zinc-700">|</span>
-            <span>{formatDate(createdAt)}</span>
+            <span>
+              {itemCount} {itemCount === 1 ? "item" : "items"}
+            </span>
           </div>
 
           {/* Assignee */}
@@ -234,26 +192,7 @@ export function FileCard({
             </p>
           )}
 
-          {/* Tags */}
-          {tags.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {tags.slice(0, 3).map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400"
-                >
-                  {tag}
-                </span>
-              ))}
-              {tags.length > 3 && (
-                <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-500">
-                  +{tags.length - 3}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Shared indicator or uploader name */}
+          {/* Shared indicator */}
           {sharedWithFamily && isOwner && (
             <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-violet-500/20 px-2 py-0.5 text-xs text-violet-400">
               <ShareIcon className="h-3 w-3" />
@@ -267,12 +206,9 @@ export function FileCard({
               {sharedWith.length === 1 ? "person" : "people"}
             </div>
           )}
-          {uploaderName && !isOwner && (
-            <p className="mt-2 text-xs text-zinc-500">From {uploaderName}</p>
-          )}
         </div>
 
-        {/* Actions menu button - always visible on mobile */}
+        {/* Actions menu button */}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -305,26 +241,21 @@ export function FileCard({
               onClick={(e) => e.stopPropagation()}
             >
               <button
-                onClick={handleDownload}
+                onClick={() => {
+                  setShowMenu(false);
+                  onClick();
+                }}
                 className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
               >
-                <DownloadIcon className="h-4 w-4" />
-                Open file
-              </button>
-              <button
-                onClick={handleShare}
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
-              >
-                <ShareIcon className="h-4 w-4" />
-                {shareStatus === "shared"
-                  ? "Shared!"
-                  : shareStatus === "copied"
-                    ? "Link copied!"
-                    : "Share link"}
+                <FolderIcon className="h-4 w-4" />
+                Open folder
               </button>
               {canShare && (
                 <button
-                  onClick={handleOpenShareModal}
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowShareModal(true);
+                  }}
                   className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
                 >
                   <ShareIcon className="h-4 w-4" />
@@ -335,6 +266,17 @@ export function FileCard({
               )}
               {isOwner && (
                 <>
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      setNewName(name);
+                      setShowRenameModal(true);
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
+                  >
+                    <EditIcon className="h-4 w-4" />
+                    Rename
+                  </button>
                   {onMoveClick && (
                     <button
                       onClick={() => {
@@ -344,12 +286,15 @@ export function FileCard({
                       className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
                     >
                       <MoveIcon className="h-4 w-4" />
-                      Move to folder
+                      Move
                     </button>
                   )}
                   {assignableMembers.length > 0 && (
                     <button
-                      onClick={handleOpenReassignModal}
+                      onClick={() => {
+                        setShowMenu(false);
+                        setShowReassignModal(true);
+                      }}
                       className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
                     >
                       <UserIcon className="h-4 w-4" />
@@ -378,12 +323,32 @@ export function FileCard({
       <Modal
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
-        title="Delete file?"
+        title="Delete folder?"
       >
-        <p className="mb-6 text-zinc-400">
-          Are you sure you want to delete &ldquo;{name}&rdquo;? This cannot be
-          undone.
+        <p className="mb-4 text-zinc-400">
+          Are you sure you want to delete &ldquo;{name}&rdquo;?
         </p>
+        {itemCount > 0 && (
+          <div className="mb-4 rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
+            <p className="mb-2 text-sm text-zinc-300">
+              This folder contains {itemCount} {itemCount === 1 ? "item" : "items"}.
+            </p>
+            <label className="flex items-center gap-2 text-sm text-zinc-400">
+              <input
+                type="checkbox"
+                checked={deleteContents}
+                onChange={(e) => setDeleteContents(e.target.checked)}
+                className="rounded border-zinc-600 bg-zinc-700"
+              />
+              Delete all contents permanently
+            </label>
+            {!deleteContents && (
+              <p className="mt-1 text-xs text-zinc-500">
+                Contents will be moved to the parent folder.
+              </p>
+            )}
+          </div>
+        )}
         <div className="flex gap-3">
           <Button
             variant="secondary"
@@ -403,28 +368,51 @@ export function FileCard({
         </div>
       </Modal>
 
-      {/* Share modal */}
-      {canShare && (
-        <ShareModal
-          isOpen={showShareModal}
-          onClose={() => setShowShareModal(false)}
-          fileId={id}
-          fileName={name}
-          sharedWithFamily={sharedWithFamily}
-          sharedWith={sharedWith}
-          familyMembers={familyMembers}
-        />
-      )}
+      {/* Rename modal */}
+      <Modal
+        isOpen={showRenameModal}
+        onClose={() => setShowRenameModal(false)}
+        title="Rename folder"
+      >
+        <div className="mb-4">
+          <Input
+            placeholder="Folder name"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void handleRename();
+            }}
+          />
+        </div>
+        <div className="flex gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => setShowRenameModal(false)}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleRename}
+            loading={isRenaming}
+            disabled={!newName.trim() || newName === name}
+            className="flex-1"
+          >
+            Rename
+          </Button>
+        </div>
+      </Modal>
 
       {/* Reassign modal */}
       {isOwner && (
         <Modal
           isOpen={showReassignModal}
           onClose={() => setShowReassignModal(false)}
-          title="Assign file"
+          title="Assign folder"
         >
           <p className="mb-4 text-sm text-zinc-400">
-            Choose who this file should be assigned to.
+            Choose who this folder should be assigned to.
           </p>
           <div className="space-y-2">
             <button
@@ -438,11 +426,11 @@ export function FileCard({
               )}
             >
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-700 text-zinc-400">
-                <FileIcon className="h-4 w-4" />
+                <FolderIcon className="h-4 w-4" />
               </div>
               <div>
                 <p className="font-medium">Unassigned</p>
-                <p className="text-xs text-zinc-500">Family documents</p>
+                <p className="text-xs text-zinc-500">Family folder</p>
               </div>
             </button>
             {assignableMembers.map((member) => (
@@ -468,6 +456,56 @@ export function FileCard({
             ))}
           </div>
           {isReassigning && (
+            <p className="mt-4 text-center text-sm text-zinc-500">Saving...</p>
+          )}
+        </Modal>
+      )}
+
+      {/* Share modal */}
+      {canShare && (
+        <Modal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          title="Share folder"
+        >
+          <p className="mb-4 text-sm text-zinc-400">
+            Choose who can see this folder and its contents.
+          </p>
+          <div className="space-y-2">
+            <button
+              onClick={() => handleShareUpdate(true, [])}
+              disabled={isSharingUpdating}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
+                sharedWithFamily
+                  ? "border-violet-500 bg-violet-500/10 text-zinc-100"
+                  : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              )}
+            >
+              <ShareIcon className="h-5 w-5 text-violet-400" />
+              <div>
+                <p className="font-medium">Share with family</p>
+                <p className="text-xs text-zinc-500">Everyone can see this folder</p>
+              </div>
+            </button>
+            <button
+              onClick={() => handleShareUpdate(false, [])}
+              disabled={isSharingUpdating}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
+                !sharedWithFamily && sharedWith.length === 0
+                  ? "border-violet-500 bg-violet-500/10 text-zinc-100"
+                  : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              )}
+            >
+              <FolderIcon className="h-5 w-5 text-zinc-400" />
+              <div>
+                <p className="font-medium">Private</p>
+                <p className="text-xs text-zinc-500">Only you can see this folder</p>
+              </div>
+            </button>
+          </div>
+          {isSharingUpdating && (
             <p className="mt-4 text-center text-sm text-zinc-500">Saving...</p>
           )}
         </Modal>

@@ -4,11 +4,16 @@ import { useState, useMemo, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { Header } from "~/components/header";
 import { FileCard } from "~/components/file-card";
+import { FolderCard } from "~/components/folder-card";
 import { FileUploader } from "~/components/file-uploader";
 import { FamilySetup } from "~/components/family-setup";
 import { FamilySettings } from "~/components/family-settings";
+import { CreateFolderModal } from "~/components/create-folder-modal";
+import { FolderBreadcrumb } from "~/components/folder-breadcrumb";
+import { MoveModal } from "~/components/move-modal";
 import { EmptyState } from "~/components/ui/empty-state";
 import { Modal } from "~/components/ui/modal";
 import {
@@ -16,10 +21,17 @@ import {
   DashboardSkeleton,
   GroupedFilesSkeleton,
 } from "~/components/ui/skeleton";
-import { PlusIcon, FileIcon, UploadIcon } from "~/components/icons";
+import { PlusIcon, FileIcon, UploadIcon, FolderIcon } from "~/components/icons";
 import { cn } from "~/lib/utils";
 
 type Tab = "my-files" | "shared";
+
+interface MoveTarget {
+  type: "file" | "folder";
+  id: Id<"files"> | Id<"folders">;
+  name: string;
+  currentFolderId?: Id<"folders">;
+}
 
 export default function DashboardPage() {
   const { user, isLoaded } = useUser();
@@ -27,6 +39,9 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showUploader, setShowUploader] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCreateFolder, setShowCreateFolder] = useState(false);
+  const [currentFolderId, setCurrentFolderId] = useState<Id<"folders"> | undefined>();
+  const [moveTarget, setMoveTarget] = useState<MoveTarget | null>(null);
 
   // Sync user with Convex
   const getOrCreateUser = useMutation(api.users.getOrCreateUser);
@@ -48,18 +63,60 @@ export default function DashboardPage() {
     user ? { clerkId: user.id } : "skip"
   );
 
-  // Fetch files
+  // Fetch folders
+  const myFolders = useQuery(
+    api.folders.getMyFolders,
+    user ? { clerkId: user.id, parentFolderId: currentFolderId } : "skip"
+  );
+
+  const sharedFolders = useQuery(
+    api.folders.getSharedFolders,
+    user ? { clerkId: user.id, parentFolderId: currentFolderId } : "skip"
+  );
+
+  // Fetch folder path for breadcrumbs
+  const folderPath = useQuery(
+    api.folders.getFolderPath,
+    user && currentFolderId ? { clerkId: user.id, folderId: currentFolderId } : "skip"
+  );
+
+  // Fetch all folders for picker
+  const allFolders = useQuery(
+    api.folders.getAllFoldersForPicker,
+    user ? { clerkId: user.id } : "skip"
+  );
+
+  // Fetch files with folder filter
   const myFiles = useQuery(
     api.files.getMyFiles,
-    user ? { clerkId: user.id } : "skip"
+    user
+      ? {
+          clerkId: user.id,
+          folderId: currentFolderId,
+          rootOnly: !currentFolderId,
+        }
+      : "skip"
   );
 
   const sharedFiles = useQuery(
     api.files.getSharedFiles,
-    user ? { clerkId: user.id } : "skip"
+    user
+      ? {
+          clerkId: user.id,
+          folderId: currentFolderId,
+          rootOnly: !currentFolderId,
+        }
+      : "skip"
   );
 
-  // Filter files by search
+  // Filter files and folders by search
+  const filteredMyFolders = useMemo(() => {
+    if (!myFolders) return [];
+    if (!searchQuery) return myFolders;
+    const term = searchQuery.toLowerCase();
+    return myFolders.filter((f) => f.name.toLowerCase().includes(term));
+  }, [myFolders, searchQuery]);
+
   const filteredMyFiles = useMemo(() => {
     if (!myFiles) return [];
     if (!searchQuery) return myFiles;
@@ -70,6 +127,24 @@ export default function DashboardPage() {
         f.tags?.some((tag) => tag.toLowerCase().includes(term))
     );
   }, [myFiles, searchQuery]);
+
+  const filteredSharedFolders = useMemo(() => {
+    if (!sharedFolders) return [];
+    if (!searchQuery) return sharedFolders;
+    const term = searchQuery.toLowerCase();
+    return sharedFolders.filter((f) => f.name.toLowerCase().includes(term));
+  }, [sharedFolders, searchQuery]);
+
+  const filteredSharedFiles = useMemo(() => {
+    if (!sharedFiles) return [];
+    if (!searchQuery) return sharedFiles;
+    const term = searchQuery.toLowerCase();
+    return sharedFiles.filter(
+      (f) =>
+        f.name.toLowerCase().includes(term) ||
+        f.tags?.some((tag) => tag.toLowerCase().includes(term))
+    );
+  }, [sharedFiles, searchQuery]);
 
   // Group files by assignee for owner view
   const groupedFiles = useMemo(() => {
@@ -97,7 +172,6 @@ export default function DashboardPage() {
         if (targetGroup) {
           targetGroup.push(file);
         } else {
-          // Assigned to someone not in members list (edge case)
           groups.unassigned?.push(file);
         }
       } else {
@@ -108,22 +182,14 @@ export default function DashboardPage() {
     return groups;
   }, [filteredMyFiles, userWithFamily]);
 
-  const filteredSharedFiles = useMemo(() => {
-    if (!sharedFiles) return [];
-    if (!searchQuery) return sharedFiles;
-    const term = searchQuery.toLowerCase();
-    return sharedFiles.filter(
-      (f) =>
-        f.name.toLowerCase().includes(term) ||
-        f.tags?.some((tag) => tag.toLowerCase().includes(term))
-    );
-  }, [sharedFiles, searchQuery]);
-
   // Group shared files by assignee
   const groupedSharedFiles = useMemo(() => {
     if (!filteredSharedFiles || filteredSharedFiles.length === 0) return null;
 
-    const groups: Record<string, { assigneeName: string; files: typeof filteredSharedFiles }> = {};
+    const groups: Record<
+      string,
+      { assigneeName: string; files: typeof filteredSharedFiles }
+    > = {};
 
     filteredSharedFiles.forEach((file) => {
       const assigneeId = file.assignedTo ?? "unassigned";
@@ -136,6 +202,12 @@ export default function DashboardPage() {
 
     return groups;
   }, [filteredSharedFiles]);
+
+  // Navigate to folder
+  const navigateToFolder = (folderId?: Id<"folders">) => {
+    setCurrentFolderId(folderId);
+    setSearchQuery("");
+  };
 
   // Loading state
   if (!isLoaded || userWithFamily === undefined) {
@@ -155,6 +227,66 @@ export default function DashboardPage() {
   const currentUser = userWithFamily.user;
   const isOwner = currentUser?.role === "owner";
 
+  // Render file card with move handler
+  const renderFileCard = (file: (typeof filteredMyFiles)[0]) => (
+    <FileCard
+      key={file._id}
+      id={file._id}
+      name={file.name}
+      url={file.url}
+      type={file.type}
+      size={file.size}
+      createdAt={file.createdAt}
+      sharedWithFamily={file.sharedWithFamily}
+      sharedWith={file.sharedWith ?? []}
+      tags={file.tags ?? []}
+      assignedTo={file.assignedTo}
+      assigneeName={file.assigneeName}
+      isOwner={isOwner}
+      familyMembers={members}
+      folderId={file.folderId}
+      onMoveClick={
+        isOwner
+          ? () =>
+              setMoveTarget({
+                type: "file",
+                id: file._id,
+                name: file.name,
+                currentFolderId: file.folderId,
+              })
+          : undefined
+      }
+    />
+  );
+
+  // Render folder card with handlers
+  const renderFolderCard = (folder: (typeof filteredMyFolders)[0]) => (
+    <FolderCard
+      key={folder._id}
+      id={folder._id}
+      name={folder.name}
+      sharedWithFamily={folder.sharedWithFamily}
+      sharedWith={folder.sharedWith ?? []}
+      assignedTo={folder.assignedTo}
+      assigneeName={folder.assigneeName}
+      itemCount={folder.itemCount}
+      isOwner={isOwner}
+      familyMembers={members}
+      onClick={() => navigateToFolder(folder._id)}
+      onMoveClick={
+        isOwner
+          ? () =>
+              setMoveTarget({
+                type: "folder",
+                id: folder._id,
+                name: folder.name,
+                currentFolderId: folder.parentFolderId,
+              })
+          : undefined
+      }
+    />
+  );
+
   return (
     <div className="min-h-screen bg-[#0a0a0b]">
       <Header
@@ -168,7 +300,10 @@ export default function DashboardPage() {
         {/* Tabs */}
         <div className="mb-6 flex gap-1 rounded-lg bg-zinc-900 p-1">
           <button
-            onClick={() => setActiveTab("my-files")}
+            onClick={() => {
+              setActiveTab("my-files");
+              setCurrentFolderId(undefined);
+            }}
             className={cn(
               "flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors",
               activeTab === "my-files"
@@ -182,7 +317,10 @@ export default function DashboardPage() {
             )}
           </button>
           <button
-            onClick={() => setActiveTab("shared")}
+            onClick={() => {
+              setActiveTab("shared");
+              setCurrentFolderId(undefined);
+            }}
             className={cn(
               "flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors",
               activeTab === "shared"
@@ -199,42 +337,95 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* File grid */}
+        {/* Breadcrumb */}
+        {currentFolderId && folderPath && folderPath.length > 0 && (
+          <FolderBreadcrumb path={folderPath} onNavigate={navigateToFolder} />
+        )}
+
+        {/* New Folder button for owner */}
+        {isOwner && activeTab === "my-files" && (
+          <div className="mb-4 flex justify-end">
+            <button
+              onClick={() => setShowCreateFolder(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700"
+            >
+              <FolderIcon className="h-4 w-4" />
+              New folder
+            </button>
+          </div>
+        )}
+
+        {/* My Files tab */}
         {activeTab === "my-files" && (
           <>
-            {myFiles === undefined ? (
+            {myFiles === undefined || myFolders === undefined ? (
               isOwner ? (
                 <GroupedFilesSkeleton />
               ) : (
                 <FileGridSkeleton />
               )
-            ) : filteredMyFiles.length === 0 ? (
+            ) : filteredMyFolders.length === 0 && filteredMyFiles.length === 0 ? (
               <EmptyState
-                icon={<FileIcon className="h-8 w-8" />}
-                title={searchQuery ? "No files found" : "No files yet"}
+                icon={
+                  currentFolderId ? (
+                    <FolderIcon className="h-8 w-8" />
+                  ) : (
+                    <FileIcon className="h-8 w-8" />
+                  )
+                }
+                title={
+                  searchQuery
+                    ? "No items found"
+                    : currentFolderId
+                      ? "Empty folder"
+                      : "No files yet"
+                }
                 description={
                   searchQuery
                     ? "Try a different search term"
                     : isOwner
-                      ? "Upload your first file to get started"
+                      ? currentFolderId
+                        ? "Upload files or create subfolders"
+                        : "Upload your first file to get started"
                       : "Files assigned to you will appear here"
                 }
                 action={
                   !searchQuery &&
                   isOwner && (
-                    <button
-                      onClick={() => setShowUploader(true)}
-                      className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 font-medium text-white hover:bg-violet-500"
-                    >
-                      <UploadIcon className="h-5 w-5" />
-                      Upload files
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setShowCreateFolder(true)}
+                        className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 font-medium text-zinc-200 hover:bg-zinc-800"
+                      >
+                        <FolderIcon className="h-5 w-5" />
+                        New folder
+                      </button>
+                      <button
+                        onClick={() => setShowUploader(true)}
+                        className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 font-medium text-white hover:bg-violet-500"
+                      >
+                        <UploadIcon className="h-5 w-5" />
+                        Upload files
+                      </button>
+                    </div>
                   )
                 }
               />
             ) : isOwner && groupedFiles ? (
               // Grouped view for owners
               <div className="space-y-8">
+                {/* Folders first - always show as flat list */}
+                {filteredMyFolders.length > 0 && (
+                  <div>
+                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
+                      Folders ({filteredMyFolders.length})
+                    </h3>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {filteredMyFolders.map(renderFolderCard)}
+                    </div>
+                  </div>
+                )}
+
                 {/* Unassigned files */}
                 {(groupedFiles.unassigned?.length ?? 0) > 0 && (
                   <div>
@@ -242,27 +433,11 @@ export default function DashboardPage() {
                       Family Documents ({groupedFiles.unassigned?.length ?? 0})
                     </h3>
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {groupedFiles.unassigned?.map((file) => (
-                        <FileCard
-                          key={file._id}
-                          id={file._id}
-                          name={file.name}
-                          url={file.url}
-                          type={file.type}
-                          size={file.size}
-                          createdAt={file.createdAt}
-                          sharedWithFamily={file.sharedWithFamily}
-                          sharedWith={file.sharedWith ?? []}
-                          tags={file.tags ?? []}
-                          assignedTo={file.assignedTo}
-                          assigneeName={file.assigneeName}
-                          isOwner={isOwner}
-                          familyMembers={members}
-                        />
-                      ))}
+                      {groupedFiles.unassigned?.map((file) => renderFileCard(file))}
                     </div>
                   </div>
                 )}
+
                 {/* Files grouped by member */}
                 {members
                   .filter((m) => m.role !== "owner")
@@ -275,7 +450,118 @@ export default function DashboardPage() {
                           {member.name}&apos;s Files ({memberFiles.length})
                         </h3>
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                          {memberFiles.map((file) => (
+                          {memberFiles.map((file) => renderFileCard(file))}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            ) : (
+              // Grouped view for members - Folders + My Files + Family Documents
+              <div className="space-y-8">
+                {/* Folders first */}
+                {filteredMyFolders.length > 0 && (
+                  <div>
+                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
+                      Folders ({filteredMyFolders.length})
+                    </h3>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {filteredMyFolders.map(renderFolderCard)}
+                    </div>
+                  </div>
+                )}
+
+                {/* Files assigned to me */}
+                {filteredMyFiles.filter((f) => f.assignedTo).length > 0 && (
+                  <div>
+                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
+                      My Files (
+                      {filteredMyFiles.filter((f) => f.assignedTo).length})
+                    </h3>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {filteredMyFiles
+                        .filter((f) => f.assignedTo)
+                        .map((file) => renderFileCard(file))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Family Documents (unassigned) */}
+                {filteredMyFiles.filter((f) => !f.assignedTo).length > 0 && (
+                  <div>
+                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
+                      Family Documents (
+                      {filteredMyFiles.filter((f) => !f.assignedTo).length})
+                    </h3>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {filteredMyFiles
+                        .filter((f) => !f.assignedTo)
+                        .map((file) => renderFileCard(file))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Shared tab */}
+        {activeTab === "shared" && (
+          <>
+            {sharedFiles === undefined || sharedFolders === undefined ? (
+              <GroupedFilesSkeleton />
+            ) : filteredSharedFolders.length === 0 &&
+              filteredSharedFiles.length === 0 ? (
+              <EmptyState
+                icon={<FileIcon className="h-8 w-8" />}
+                title={searchQuery ? "No items found" : "No shared files"}
+                description={
+                  searchQuery
+                    ? "Try a different search term"
+                    : "Files shared by family members will appear here"
+                }
+              />
+            ) : (
+              <div className="space-y-8">
+                {/* Shared folders first */}
+                {filteredSharedFolders.length > 0 && (
+                  <div>
+                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
+                      Shared Folders ({filteredSharedFolders.length})
+                    </h3>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {filteredSharedFolders.map((folder) => (
+                        <FolderCard
+                          key={folder._id}
+                          id={folder._id}
+                          name={folder.name}
+                          sharedWithFamily={folder.sharedWithFamily}
+                          sharedWith={folder.sharedWith ?? []}
+                          assignedTo={folder.assignedTo}
+                          assigneeName={folder.assigneeName}
+                          itemCount={folder.itemCount}
+                          isOwner={false}
+                          familyMembers={members}
+                          onClick={() => navigateToFolder(folder._id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Shared files grouped by assignee */}
+                {groupedSharedFiles &&
+                  Object.entries(groupedSharedFiles).map(
+                    ([assigneeId, group]) => (
+                      <div key={assigneeId}>
+                        <h3 className="mb-4 text-sm font-medium text-zinc-400">
+                          {group.assigneeName === "Family Documents"
+                            ? "Family Documents"
+                            : `${group.assigneeName}'s Files`}{" "}
+                          ({group.files.length})
+                        </h3>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {group.files.map((file) => (
                             <FileCard
                               key={file._id}
                               id={file._id}
@@ -289,132 +575,17 @@ export default function DashboardPage() {
                               tags={file.tags ?? []}
                               assignedTo={file.assignedTo}
                               assigneeName={file.assigneeName}
-                              isOwner={isOwner}
+                              isOwner={false}
+                              uploaderName={file.uploaderName}
                               familyMembers={members}
                             />
                           ))}
                         </div>
                       </div>
-                    );
-                  })}
-              </div>
-            ) : (
-              // Grouped view for members - My Files + Family Documents
-              <div className="space-y-8">
-                {/* Files assigned to me */}
-                {filteredMyFiles.filter((f) => f.assignedTo).length > 0 && (
-                  <div>
-                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
-                      My Files ({filteredMyFiles.filter((f) => f.assignedTo).length})
-                    </h3>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {filteredMyFiles
-                        .filter((f) => f.assignedTo)
-                        .map((file) => (
-                          <FileCard
-                            key={file._id}
-                            id={file._id}
-                            name={file.name}
-                            url={file.url}
-                            type={file.type}
-                            size={file.size}
-                            createdAt={file.createdAt}
-                            sharedWithFamily={file.sharedWithFamily}
-                            sharedWith={file.sharedWith ?? []}
-                            tags={file.tags ?? []}
-                            assignedTo={file.assignedTo}
-                            assigneeName={file.assigneeName}
-                            isOwner={isOwner}
-                            familyMembers={members}
-                          />
-                        ))}
-                    </div>
-                  </div>
-                )}
-                {/* Family Documents (unassigned) */}
-                {filteredMyFiles.filter((f) => !f.assignedTo).length > 0 && (
-                  <div>
-                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
-                      Family Documents ({filteredMyFiles.filter((f) => !f.assignedTo).length})
-                    </h3>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {filteredMyFiles
-                        .filter((f) => !f.assignedTo)
-                        .map((file) => (
-                          <FileCard
-                            key={file._id}
-                            id={file._id}
-                            name={file.name}
-                            url={file.url}
-                            type={file.type}
-                            size={file.size}
-                            createdAt={file.createdAt}
-                            sharedWithFamily={file.sharedWithFamily}
-                            sharedWith={file.sharedWith ?? []}
-                            tags={file.tags ?? []}
-                            assignedTo={file.assignedTo}
-                            assigneeName={file.assigneeName}
-                            isOwner={isOwner}
-                            familyMembers={members}
-                          />
-                        ))}
-                    </div>
-                  </div>
-                )}
+                    )
+                  )}
               </div>
             )}
-          </>
-        )}
-
-        {activeTab === "shared" && (
-          <>
-            {sharedFiles === undefined ? (
-              <GroupedFilesSkeleton />
-            ) : filteredSharedFiles.length === 0 ? (
-              <EmptyState
-                icon={<FileIcon className="h-8 w-8" />}
-                title={searchQuery ? "No files found" : "No shared files"}
-                description={
-                  searchQuery
-                    ? "Try a different search term"
-                    : "Files shared by family members will appear here"
-                }
-              />
-            ) : groupedSharedFiles ? (
-              <div className="space-y-8">
-                {Object.entries(groupedSharedFiles).map(([assigneeId, group]) => (
-                  <div key={assigneeId}>
-                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
-                      {group.assigneeName === "Family Documents"
-                        ? "Family Documents"
-                        : `${group.assigneeName}'s Files`}{" "}
-                      ({group.files.length})
-                    </h3>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {group.files.map((file) => (
-                        <FileCard
-                          key={file._id}
-                          id={file._id}
-                          name={file.name}
-                          url={file.url}
-                          type={file.type}
-                          size={file.size}
-                          createdAt={file.createdAt}
-                          sharedWithFamily={file.sharedWithFamily}
-                          sharedWith={file.sharedWith ?? []}
-                          tags={file.tags ?? []}
-                          assignedTo={file.assignedTo}
-                          assigneeName={file.assigneeName}
-                          isOwner={false}
-                          uploaderName={file.uploaderName}
-                          familyMembers={members}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
           </>
         )}
       </main>
@@ -443,8 +614,30 @@ export default function DashboardPage() {
         <FileUploader
           onClose={() => setShowUploader(false)}
           familyMembers={members}
+          currentFolderId={currentFolderId}
+          folders={allFolders ?? []}
         />
       </Modal>
+
+      {/* Create folder modal */}
+      <CreateFolderModal
+        isOpen={showCreateFolder}
+        onClose={() => setShowCreateFolder(false)}
+        parentFolderId={currentFolderId}
+        familyMembers={members}
+      />
+
+      {/* Move modal */}
+      {moveTarget && (
+        <MoveModal
+          isOpen={!!moveTarget}
+          onClose={() => setMoveTarget(null)}
+          itemType={moveTarget.type}
+          itemId={moveTarget.id}
+          itemName={moveTarget.name}
+          currentFolderId={moveTarget.currentFolderId}
+        />
+      )}
 
       {/* Settings modal */}
       <FamilySettings

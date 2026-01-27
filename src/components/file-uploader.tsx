@@ -21,9 +21,17 @@ interface FamilyMember {
   role?: "owner" | "member";
 }
 
+interface FolderOption {
+  _id: Id<"folders">;
+  name: string;
+  parentFolderId?: Id<"folders">;
+}
+
 interface FileUploaderProps {
   onClose?: () => void;
   familyMembers: FamilyMember[];
+  currentFolderId?: Id<"folders">;
+  folders?: FolderOption[];
 }
 
 interface PendingFile {
@@ -31,6 +39,7 @@ interface PendingFile {
   customName: string;
   originalName: string;
   assignedTo?: Id<"users">;
+  folderId?: Id<"folders">;
   tags: string[];
 }
 
@@ -47,6 +56,7 @@ interface UploadingFile {
 interface UploadMetadata {
   originalName: string;
   assignedTo?: Id<"users">;
+  folderId?: Id<"folders">;
   tags: string[];
 }
 
@@ -84,7 +94,12 @@ async function compressImage(file: File): Promise<File> {
   }
 }
 
-export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
+export function FileUploader({
+  onClose,
+  familyMembers,
+  currentFolderId,
+  folders = [],
+}: FileUploaderProps) {
   const { user } = useUser();
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
@@ -128,6 +143,7 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
             size: result.size,
             clerkId: user.id,
             assignedTo: metadata?.assignedTo,
+            folderId: metadata?.folderId,
             tags: metadata?.tags ?? [],
           });
 
@@ -161,20 +177,24 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
     },
   });
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return;
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      if (acceptedFiles.length === 0) return;
 
-    // Add files to pending with default names
-    const newPendingFiles = acceptedFiles.map((file) => ({
-      file,
-      customName: file.name.replace(/\.[^/.]+$/, ""), // Remove extension for display
-      originalName: file.name,
-      assignedTo: undefined,
-      tags: [],
-    }));
+      // Add files to pending with default names
+      const newPendingFiles = acceptedFiles.map((file) => ({
+        file,
+        customName: file.name.replace(/\.[^/.]+$/, ""), // Remove extension for display
+        originalName: file.name,
+        assignedTo: undefined,
+        folderId: currentFolderId,
+        tags: [],
+      }));
 
-    setPendingFiles((prev) => [...prev, ...newPendingFiles]);
-  }, []);
+      setPendingFiles((prev) => [...prev, ...newPendingFiles]);
+    },
+    [currentFolderId]
+  );
 
   const updateFileName = (index: number, newName: string) => {
     setPendingFiles((prev) =>
@@ -185,6 +205,12 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
   const updateAssignee = (index: number, assignedTo?: Id<"users">) => {
     setPendingFiles((prev) =>
       prev.map((f, i) => (i === index ? { ...f, assignedTo } : f))
+    );
+  };
+
+  const updateFolder = (index: number, folderId?: Id<"folders">) => {
+    setPendingFiles((prev) =>
+      prev.map((f, i) => (i === index ? { ...f, folderId } : f))
     );
   };
 
@@ -234,6 +260,7 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
       uploadMetadataRef.current.set(formattedName, {
         originalName: pending.originalName,
         assignedTo: pending.assignedTo,
+        folderId: pending.folderId,
         tags: pending.tags,
       });
 
@@ -368,6 +395,34 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
                   getExtension(pending.originalName)
                 )}
               </p>
+
+              {/* Folder selection */}
+              {folders.length > 0 && (
+                <div className="mt-4">
+                  <label className="mb-1.5 block text-sm font-medium text-zinc-400">
+                    Folder
+                  </label>
+                  <select
+                    value={pending.folderId ?? ""}
+                    onChange={(e) =>
+                      updateFolder(
+                        index,
+                        e.target.value
+                          ? (e.target.value as Id<"folders">)
+                          : undefined
+                      )
+                    }
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                  >
+                    <option value="">Root (no folder)</option>
+                    {folders.map((folder) => (
+                      <option key={folder._id} value={folder._id}>
+                        {folder.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Assign to member */}
               {assignableMembers.length > 0 && (
