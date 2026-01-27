@@ -87,6 +87,12 @@ export function FileCard({
   // Get non-owner members for assignment
   const assignableMembers = familyMembers.filter((m) => m.role !== "owner");
 
+  // Check if current user can share this file (owner OR file is assigned to them)
+  const currentUserEmail = user?.primaryEmailAddress?.emailAddress;
+  const currentMember = familyMembers.find((m) => m.email === currentUserEmail);
+  const isAssignedToMe = currentMember && assignedTo === currentMember._id;
+  const canShare = isOwner || isAssignedToMe;
+
   const fileIcon = getFileIcon(type);
   const isImage = type.startsWith("image/");
 
@@ -312,17 +318,19 @@ export function FileCard({
                     ? "Link copied!"
                     : "Share link"}
               </button>
+              {canShare && (
+                <button
+                  onClick={handleOpenShareModal}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
+                >
+                  <ShareIcon className="h-4 w-4" />
+                  {sharedWithFamily || isSharedWithSome
+                    ? "Manage sharing"
+                    : "Share with family"}
+                </button>
+              )}
               {isOwner && (
                 <>
-                  <button
-                    onClick={handleOpenShareModal}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
-                  >
-                    <ShareIcon className="h-4 w-4" />
-                    {sharedWithFamily || isSharedWithSome
-                      ? "Manage sharing"
-                      : "Share with family"}
-                  </button>
                   {assignableMembers.length > 0 && (
                     <button
                       onClick={handleOpenReassignModal}
@@ -380,7 +388,7 @@ export function FileCard({
       </Modal>
 
       {/* Share modal */}
-      {isOwner && (
+      {canShare && (
         <ShareModal
           isOpen={showShareModal}
           onClose={() => setShowShareModal(false)}

@@ -119,6 +119,26 @@ export default function DashboardPage() {
     );
   }, [sharedFiles, searchQuery]);
 
+  // Group shared files by assignee
+  const groupedSharedFiles = useMemo(() => {
+    if (!filteredSharedFiles || filteredSharedFiles.length === 0) return null;
+
+    const groups: Record<string, { assigneeName: string; files: typeof filteredSharedFiles }> = {};
+
+    filteredSharedFiles.forEach((file) => {
+      const assigneeId = file.assignedTo ?? "unassigned";
+      if (!groups[assigneeId]) {
+        groups[assigneeId] = {
+          assigneeName: file.assigneeName ?? "Family Documents",
+          files: [],
+        };
+      }
+      groups[assigneeId].files.push(file);
+    });
+
+    return groups;
+  }, [filteredSharedFiles]);
+
   // Loading state
   if (!isLoaded || userWithFamily === undefined) {
     return <DashboardSkeleton />;
@@ -281,26 +301,68 @@ export default function DashboardPage() {
                   })}
               </div>
             ) : (
-              // Simple grid for members
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredMyFiles.map((file) => (
-                  <FileCard
-                    key={file._id}
-                    id={file._id}
-                    name={file.name}
-                    url={file.url}
-                    type={file.type}
-                    size={file.size}
-                    createdAt={file.createdAt}
-                    sharedWithFamily={file.sharedWithFamily}
-                    sharedWith={file.sharedWith ?? []}
-                    tags={file.tags ?? []}
-                    assignedTo={file.assignedTo}
-                    assigneeName={file.assigneeName}
-                    isOwner={isOwner}
-                    familyMembers={members}
-                  />
-                ))}
+              // Grouped view for members - My Files + Family Documents
+              <div className="space-y-8">
+                {/* Files assigned to me */}
+                {filteredMyFiles.filter((f) => f.assignedTo).length > 0 && (
+                  <div>
+                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
+                      My Files ({filteredMyFiles.filter((f) => f.assignedTo).length})
+                    </h3>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {filteredMyFiles
+                        .filter((f) => f.assignedTo)
+                        .map((file) => (
+                          <FileCard
+                            key={file._id}
+                            id={file._id}
+                            name={file.name}
+                            url={file.url}
+                            type={file.type}
+                            size={file.size}
+                            createdAt={file.createdAt}
+                            sharedWithFamily={file.sharedWithFamily}
+                            sharedWith={file.sharedWith ?? []}
+                            tags={file.tags ?? []}
+                            assignedTo={file.assignedTo}
+                            assigneeName={file.assigneeName}
+                            isOwner={isOwner}
+                            familyMembers={members}
+                          />
+                        ))}
+                    </div>
+                  </div>
+                )}
+                {/* Family Documents (unassigned) */}
+                {filteredMyFiles.filter((f) => !f.assignedTo).length > 0 && (
+                  <div>
+                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
+                      Family Documents ({filteredMyFiles.filter((f) => !f.assignedTo).length})
+                    </h3>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {filteredMyFiles
+                        .filter((f) => !f.assignedTo)
+                        .map((file) => (
+                          <FileCard
+                            key={file._id}
+                            id={file._id}
+                            name={file.name}
+                            url={file.url}
+                            type={file.type}
+                            size={file.size}
+                            createdAt={file.createdAt}
+                            sharedWithFamily={file.sharedWithFamily}
+                            sharedWith={file.sharedWith ?? []}
+                            tags={file.tags ?? []}
+                            assignedTo={file.assignedTo}
+                            assigneeName={file.assigneeName}
+                            isOwner={isOwner}
+                            familyMembers={members}
+                          />
+                        ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -309,7 +371,7 @@ export default function DashboardPage() {
         {activeTab === "shared" && (
           <>
             {sharedFiles === undefined ? (
-              <FileGridSkeleton />
+              <GroupedFilesSkeleton />
             ) : filteredSharedFiles.length === 0 ? (
               <EmptyState
                 icon={<FileIcon className="h-8 w-8" />}
@@ -320,29 +382,41 @@ export default function DashboardPage() {
                     : "Files shared by family members will appear here"
                 }
               />
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredSharedFiles.map((file) => (
-                  <FileCard
-                    key={file._id}
-                    id={file._id}
-                    name={file.name}
-                    url={file.url}
-                    type={file.type}
-                    size={file.size}
-                    createdAt={file.createdAt}
-                    sharedWithFamily={file.sharedWithFamily}
-                    sharedWith={file.sharedWith ?? []}
-                    tags={file.tags ?? []}
-                    assignedTo={file.assignedTo}
-                    assigneeName={file.assigneeName}
-                    isOwner={false}
-                    uploaderName={file.uploaderName}
-                    familyMembers={members}
-                  />
+            ) : groupedSharedFiles ? (
+              <div className="space-y-8">
+                {Object.entries(groupedSharedFiles).map(([assigneeId, group]) => (
+                  <div key={assigneeId}>
+                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
+                      {group.assigneeName === "Family Documents"
+                        ? "Family Documents"
+                        : `${group.assigneeName}'s Files`}{" "}
+                      ({group.files.length})
+                    </h3>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {group.files.map((file) => (
+                        <FileCard
+                          key={file._id}
+                          id={file._id}
+                          name={file.name}
+                          url={file.url}
+                          type={file.type}
+                          size={file.size}
+                          createdAt={file.createdAt}
+                          sharedWithFamily={file.sharedWithFamily}
+                          sharedWith={file.sharedWith ?? []}
+                          tags={file.tags ?? []}
+                          assignedTo={file.assignedTo}
+                          assigneeName={file.assigneeName}
+                          isOwner={false}
+                          uploaderName={file.uploaderName}
+                          familyMembers={members}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
-            )}
+            ) : null}
           </>
         )}
       </main>

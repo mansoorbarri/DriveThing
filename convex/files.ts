@@ -89,7 +89,7 @@ export const getAllFamilyFiles = query({
 
 // Get files for current user
 // - Owners see all files they uploaded
-// - Members see files assigned to them
+// - Members see files assigned to them + unassigned family documents
 export const getMyFiles = query({
   args: { clerkId: v.string() },
   handler: async (ctx, args) => {
@@ -117,8 +117,10 @@ export const getMyFiles = query({
       // Owner sees all files they uploaded
       myFiles = allFamilyFiles.filter((file) => file.uploadedBy === user._id);
     } else {
-      // Members see files assigned to them
-      myFiles = allFamilyFiles.filter((file) => file.assignedTo === user._id);
+      // Members see files assigned to them + unassigned family documents
+      myFiles = allFamilyFiles.filter(
+        (file) => file.assignedTo === user._id || !file.assignedTo
+      );
     }
 
     // Get assigned user info for each file
@@ -165,7 +167,10 @@ export const getSharedFiles = query({
     // Filter to files user can see:
     // 1. Shared with whole family (and not assigned to them - they see those in My Files)
     // 2. Specifically shared with this user (and not assigned to them)
+    // 3. Exclude unassigned files - everyone sees those in My Files
     const visibleFiles = allFamilyFiles.filter((file) => {
+      // Exclude unassigned files (family documents) - they appear in My Files for everyone
+      if (!file.assignedTo) return false;
       // Exclude files assigned to this user (they see those in My Files)
       if (file.assignedTo === user._id) return false;
       // Exclude files uploaded by this user (owner sees in My Files)
@@ -197,6 +202,8 @@ export const getSharedFiles = query({
 });
 
 // Update file sharing settings
+// Owners can share any file they uploaded
+// Members can share files assigned to them
 export const updateFileSharing = mutation({
   args: {
     fileId: v.id("files"),
@@ -215,8 +222,16 @@ export const updateFileSharing = mutation({
     }
 
     const file = await ctx.db.get(args.fileId);
-    if (!file || file.uploadedBy !== user._id) {
-      throw new Error("File not found or not owned by user");
+    if (!file) {
+      throw new Error("File not found");
+    }
+
+    // Allow if user is the uploader (owner) OR if the file is assigned to them
+    const canShare =
+      file.uploadedBy === user._id || file.assignedTo === user._id;
+
+    if (!canShare) {
+      throw new Error("Not authorized to share this file");
     }
 
     await ctx.db.patch(args.fileId, {
@@ -243,8 +258,16 @@ export const toggleShareFile = mutation({
     }
 
     const file = await ctx.db.get(args.fileId);
-    if (!file || file.uploadedBy !== user._id) {
-      throw new Error("File not found or not owned by user");
+    if (!file) {
+      throw new Error("File not found");
+    }
+
+    // Allow if user is the uploader (owner) OR if the file is assigned to them
+    const canShare =
+      file.uploadedBy === user._id || file.assignedTo === user._id;
+
+    if (!canShare) {
+      throw new Error("Not authorized to share this file");
     }
 
     await ctx.db.patch(args.fileId, {
