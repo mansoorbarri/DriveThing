@@ -11,6 +11,7 @@ import { FamilySetup } from "~/components/family-setup";
 import { FamilySettings } from "~/components/family-settings";
 import { EmptyState } from "~/components/ui/empty-state";
 import { Modal } from "~/components/ui/modal";
+import { FileGridSkeleton } from "~/components/ui/skeleton";
 import { PlusIcon, FileIcon, UploadIcon } from "~/components/icons";
 import { cn } from "~/lib/utils";
 
@@ -139,7 +140,9 @@ export default function DashboardPage() {
         {/* File grid */}
         {activeTab === "my-files" && (
           <>
-            {filteredMyFiles.length === 0 ? (
+            {myFiles === undefined ? (
+              <FileGridSkeleton />
+            ) : filteredMyFiles.length === 0 ? (
               <EmptyState
                 icon={<FileIcon className="h-8 w-8" />}
                 title={searchQuery ? "No files found" : "No files yet"}
@@ -182,7 +185,9 @@ export default function DashboardPage() {
 
         {activeTab === "shared" && (
           <>
-            {filteredSharedFiles.length === 0 ? (
+            {sharedFiles === undefined ? (
+              <FileGridSkeleton />
+            ) : filteredSharedFiles.length === 0 ? (
               <EmptyState
                 icon={<FileIcon className="h-8 w-8" />}
                 title={searchQuery ? "No files found" : "No shared files"}
