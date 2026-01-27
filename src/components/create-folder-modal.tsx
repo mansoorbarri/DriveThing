@@ -36,8 +36,8 @@ export function CreateFolderModal({
 
   const createFolder = useMutation(api.folders.createFolder);
 
-  // All members except owner can be assigned
-  const assignableMembers = familyMembers.filter((m) => m.role !== "owner");
+  // All family members (including owner) can be assigned
+  const assignableMembers = familyMembers;
 
   const handleCreate = async () => {
     if (!user || !name.trim()) return;
@@ -100,6 +100,7 @@ export function CreateFolderModal({
               {assignableMembers.map((member) => (
                 <option key={member._id} value={member._id}>
                   {member.name}
+                  {member.role === "owner" ? " (Me)" : ""}
                 </option>
               ))}
             </select>
