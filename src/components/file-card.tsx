@@ -55,11 +55,13 @@ export function FileCard({
   const [shareStatus, setShareStatus] = useState<"idle" | "shared" | "copied">(
     "idle"
   );
+  const [imageError, setImageError] = useState(false);
 
   const deleteFile = useMutation(api.files.deleteFile);
   const toggleShare = useMutation(api.files.toggleShareFile);
 
   const fileIcon = getFileIcon(type);
+  const isImage = type.startsWith("image/");
 
   const handleShare = async () => {
     const canShare = typeof navigator !== "undefined" && "share" in navigator;
@@ -93,6 +95,12 @@ export function FileCard({
     setShowMenu(false);
   };
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't open file if clicking menu button or dropdown
+    if ((e.target as HTMLElement).closest("button")) return;
+    window.open(url, "_blank");
+  };
+
   const IconComponent = {
     image: ImageIcon,
     pdf: PdfIcon,
@@ -109,46 +117,68 @@ export function FileCard({
 
   return (
     <>
-      <div className="group relative rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md">
-        {/* File icon and preview */}
-        <div
-          className={cn(
-            "mb-3 flex h-12 w-12 items-center justify-center rounded-lg",
-            iconColors[fileIcon]
-          )}
-        >
-          <IconComponent className="h-6 w-6" />
-        </div>
-
-        {/* File name */}
-        <h3 className="mb-1 truncate font-medium text-gray-900" title={name}>
-          {name}
-        </h3>
-
-        {/* File info */}
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <span>{formatFileSize(size)}</span>
-          <span className="text-gray-300">|</span>
-          <span>{formatDate(createdAt)}</span>
-        </div>
-
-        {/* Shared indicator or uploader name */}
-        {sharedWithFamily && isOwner && (
-          <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
-            <ShareIcon className="h-3 w-3" />
-            Shared
+      <div
+        onClick={handleCardClick}
+        className="group relative cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white transition-shadow hover:shadow-md active:bg-gray-50"
+      >
+        {/* Image preview or icon */}
+        {isImage && !imageError ? (
+          <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
+            <img
+              src={url}
+              alt={name}
+              className="h-full w-full object-cover"
+              onError={() => setImageError(true)}
+            />
+          </div>
+        ) : (
+          <div className="p-4 pb-0">
+            <div
+              className={cn(
+                "flex h-12 w-12 items-center justify-center rounded-lg",
+                iconColors[fileIcon]
+              )}
+            >
+              <IconComponent className="h-6 w-6" />
+            </div>
           </div>
         )}
-        {uploaderName && !isOwner && (
-          <p className="mt-2 text-xs text-gray-400">From {uploaderName}</p>
-        )}
 
-        {/* Actions menu button */}
+        {/* File info */}
+        <div className="p-4">
+          <h3 className="mb-1 truncate font-medium text-gray-900" title={name}>
+            {name}
+          </h3>
+
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>{formatFileSize(size)}</span>
+            <span className="text-gray-300">|</span>
+            <span>{formatDate(createdAt)}</span>
+          </div>
+
+          {/* Shared indicator or uploader name */}
+          {sharedWithFamily && isOwner && (
+            <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+              <ShareIcon className="h-3 w-3" />
+              Shared with family
+            </div>
+          )}
+          {uploaderName && !isOwner && (
+            <p className="mt-2 text-xs text-gray-400">From {uploaderName}</p>
+          )}
+        </div>
+
+        {/* Actions menu button - always visible on mobile */}
         <button
-          onClick={() => setShowMenu(!showMenu)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowMenu(!showMenu);
+          }}
           className={cn(
-            "absolute right-3 top-3 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600",
-            "opacity-0 transition-opacity group-hover:opacity-100",
+            "absolute right-3 top-3 rounded-lg bg-white/90 p-1.5 text-gray-500 shadow-sm backdrop-blur-sm",
+            "hover:bg-white hover:text-gray-700",
+            "opacity-100 sm:opacity-0 sm:group-hover:opacity-100",
+            "transition-opacity",
             showMenu && "opacity-100"
           )}
           aria-label="More options"
@@ -161,19 +191,25 @@ export function FileCard({
           <>
             <div
               className="fixed inset-0 z-10"
-              onClick={() => setShowMenu(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu(false);
+              }}
             />
-            <div className="absolute right-3 top-12 z-20 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+            <div
+              className="absolute right-3 top-12 z-20 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
               <button
                 onClick={handleDownload}
-                className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100"
               >
                 <DownloadIcon className="h-4 w-4" />
                 Open file
               </button>
               <button
                 onClick={handleShare}
-                className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100"
               >
                 <ShareIcon className="h-4 w-4" />
                 {shareStatus === "shared"
@@ -186,7 +222,7 @@ export function FileCard({
                 <>
                   <button
                     onClick={handleToggleShareWithFamily}
-                    className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100"
                   >
                     <ShareIcon className="h-4 w-4" />
                     {sharedWithFamily ? "Unshare with family" : "Share with family"}
@@ -197,7 +233,7 @@ export function FileCard({
                       setShowMenu(false);
                       setShowDeleteConfirm(true);
                     }}
-                    className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 active:bg-red-100"
                   >
                     <TrashIcon className="h-4 w-4" />
                     Delete
