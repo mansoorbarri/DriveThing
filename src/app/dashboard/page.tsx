@@ -158,11 +158,9 @@ export default function DashboardPage() {
       unassigned: [],
     };
 
-    // Create groups for each member
+    // Create groups for each member (including owner)
     familyMembers.forEach((m) => {
-      if (m.role !== "owner") {
-        groups[m._id] = [];
-      }
+      groups[m._id] = [];
     });
 
     // Sort files into groups
@@ -438,23 +436,21 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* Files grouped by member */}
-                {members
-                  .filter((m) => m.role !== "owner")
-                  .map((member) => {
-                    const memberFiles = groupedFiles[member._id] ?? [];
-                    if (memberFiles.length === 0) return null;
-                    return (
-                      <div key={member._id}>
-                        <h3 className="mb-4 text-sm font-medium text-zinc-400">
-                          {member.name}&apos;s Files ({memberFiles.length})
-                        </h3>
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                          {memberFiles.map((file) => renderFileCard(file))}
-                        </div>
+                {/* Files grouped by member (including owner) */}
+                {members.map((member) => {
+                  const memberFiles = groupedFiles[member._id] ?? [];
+                  if (memberFiles.length === 0) return null;
+                  return (
+                    <div key={member._id}>
+                      <h3 className="mb-4 text-sm font-medium text-zinc-400">
+                        {member.name}&apos;s Files ({memberFiles.length})
+                      </h3>
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {memberFiles.map((file) => renderFileCard(file))}
                       </div>
-                    );
-                  })}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               // Grouped view for members - Folders + My Files + Family Documents

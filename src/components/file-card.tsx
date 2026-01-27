@@ -88,8 +88,8 @@ export function FileCard({
   const deleteFile = useMutation(api.files.deleteFile);
   const updateAssignment = useMutation(api.files.updateFileAssignment);
 
-  // Get non-owner members for assignment
-  const assignableMembers = familyMembers.filter((m) => m.role !== "owner");
+  // All family members (including owner) can be assigned
+  const assignableMembers = familyMembers;
 
   // Check if current user can share this file (owner OR file is assigned to them)
   const currentUserEmail = user?.primaryEmailAddress?.emailAddress;
@@ -461,7 +461,10 @@ export function FileCard({
                   {member.name[0]?.toUpperCase()}
                 </div>
                 <div>
-                  <p className="font-medium">{member.name}</p>
+                  <p className="font-medium">
+                    {member.name}
+                    {member.role === "owner" ? " (Me)" : ""}
+                  </p>
                   <p className="text-xs text-zinc-500">{member.email}</p>
                 </div>
               </button>
