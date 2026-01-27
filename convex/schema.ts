@@ -28,13 +28,16 @@ export default defineSchema({
   // Files - stored file metadata
   files: defineTable({
     name: v.string(),
+    originalName: v.string(), // Original filename
     url: v.string(),
     fileKey: v.string(), // UploadThing file key for deletion
     type: v.string(), // MIME type
     size: v.number(), // bytes
     uploadedBy: v.id("users"),
     familyId: v.id("families"),
+    // Sharing options
     sharedWithFamily: v.boolean(), // if true, all family members can see
+    sharedWith: v.optional(v.array(v.id("users"))), // specific users to share with
     createdAt: v.number(),
   })
     .index("by_uploader", ["uploadedBy"])

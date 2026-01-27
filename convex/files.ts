@@ -5,6 +5,7 @@ import { mutation, query } from "./_generated/server";
 export const createFile = mutation({
   args: {
     name: v.string(),
+    originalName: v.string(),
     url: v.string(),
     fileKey: v.string(),
     type: v.string(),
@@ -23,6 +24,7 @@ export const createFile = mutation({
 
     return await ctx.db.insert("files", {
       name: args.name,
+      originalName: args.originalName,
       url: args.url,
       fileKey: args.fileKey,
       type: args.type,
@@ -30,6 +32,7 @@ export const createFile = mutation({
       uploadedBy: user._id,
       familyId: user.familyId,
       sharedWithFamily: false,
+      sharedWith: [],
       createdAt: Date.now(),
     });
   },
@@ -58,7 +61,7 @@ export const getMyFiles = query({
   },
 });
 
-// Get files shared with family (that user can see)
+// Get files shared with the current user
 export const getSharedFiles = query({
   args: { clerkId: v.string() },
   handler: async (ctx, args) => {
@@ -73,33 +76,69 @@ export const getSharedFiles = query({
 
     const familyId = user.familyId;
 
-    // Get all shared files in the family (excluding user's own)
-    const files = await ctx.db
+    // Get all files in the family (excluding user's own)
+    const allFamilyFiles = await ctx.db
       .query("files")
-      .withIndex("by_family_shared", (q) =>
-        q.eq("familyId", familyId).eq("sharedWithFamily", true)
-      )
+      .withIndex("by_family", (q) => q.eq("familyId", familyId))
       .order("desc")
       .collect();
 
+    // Filter to files user can see:
+    // 1. Shared with whole family
+    // 2. Specifically shared with this user
+    const visibleFiles = allFamilyFiles.filter((file) => {
+      if (file.uploadedBy === user._id) return false; // Exclude own files
+      if (file.sharedWithFamily) return true;
+      if (file.sharedWith?.includes(user._id)) return true;
+      return false;
+    });
+
     // Get uploader info for each file
     const filesWithUploader = await Promise.all(
-      files
-        .filter((f) => f.uploadedBy !== user._id)
-        .map(async (file) => {
-          const uploader = await ctx.db.get(file.uploadedBy);
-          return {
-            ...file,
-            uploaderName: uploader?.name ?? "Unknown",
-          };
-        })
+      visibleFiles.map(async (file) => {
+        const uploader = await ctx.db.get(file.uploadedBy);
+        return {
+          ...file,
+          uploaderName: uploader?.name ?? "Unknown",
+        };
+      })
     );
 
     return filesWithUploader;
   },
 });
 
-// Toggle share status of a file
+// Update file sharing settings
+export const updateFileSharing = mutation({
+  args: {
+    fileId: v.id("files"),
+    clerkId: v.string(),
+    shareWithFamily: v.boolean(),
+    sharedWith: v.array(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const file = await ctx.db.get(args.fileId);
+    if (!file || file.uploadedBy !== user._id) {
+      throw new Error("File not found or not owned by user");
+    }
+
+    await ctx.db.patch(args.fileId, {
+      sharedWithFamily: args.shareWithFamily,
+      sharedWith: args.sharedWith,
+    });
+  },
+});
+
+// Toggle share with whole family (legacy support)
 export const toggleShareFile = mutation({
   args: {
     fileId: v.id("files"),
@@ -217,13 +256,17 @@ export const searchFiles = query({
     let sharedFiles: typeof myFiles = [];
     if (user.familyId) {
       const familyId = user.familyId;
-      sharedFiles = await ctx.db
+      const allFamilyFiles = await ctx.db
         .query("files")
-        .withIndex("by_family_shared", (q) =>
-          q.eq("familyId", familyId).eq("sharedWithFamily", true)
-        )
+        .withIndex("by_family", (q) => q.eq("familyId", familyId))
         .collect();
-      sharedFiles = sharedFiles.filter((f) => f.uploadedBy !== user._id);
+
+      sharedFiles = allFamilyFiles.filter((file) => {
+        if (file.uploadedBy === user._id) return false;
+        if (file.sharedWithFamily) return true;
+        if (file.sharedWith?.includes(user._id)) return true;
+        return false;
+      });
     }
 
     const allFiles = [...myFiles, ...sharedFiles];

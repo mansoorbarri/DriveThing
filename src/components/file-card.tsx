@@ -25,6 +25,15 @@ import {
 } from "./icons";
 import { Button } from "./ui/button";
 import { Modal } from "./ui/modal";
+import { ShareModal } from "./share-modal";
+
+interface FamilyMember {
+  _id: Id<"users">;
+  name: string;
+  email: string;
+  imageUrl?: string;
+  role?: "owner" | "member";
+}
 
 interface FileCardProps {
   id: Id<"files">;
@@ -34,8 +43,10 @@ interface FileCardProps {
   size: number;
   createdAt: number;
   sharedWithFamily: boolean;
+  sharedWith?: Id<"users">[];
   isOwner: boolean;
   uploaderName?: string;
+  familyMembers?: FamilyMember[];
 }
 
 export function FileCard({
@@ -46,12 +57,15 @@ export function FileCard({
   size,
   createdAt,
   sharedWithFamily,
+  sharedWith = [],
   isOwner,
   uploaderName,
+  familyMembers = [],
 }: FileCardProps) {
   const { user } = useUser();
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [shareStatus, setShareStatus] = useState<"idle" | "shared" | "copied">(
     "idle"
@@ -59,7 +73,6 @@ export function FileCard({
   const [imageError, setImageError] = useState(false);
 
   const deleteFile = useMutation(api.files.deleteFile);
-  const toggleShare = useMutation(api.files.toggleShareFile);
 
   const fileIcon = getFileIcon(type);
   const isImage = type.startsWith("image/");
@@ -74,11 +87,13 @@ export function FileCard({
     setShowMenu(false);
   };
 
-  const handleToggleShareWithFamily = async () => {
-    if (!user) return;
-    await toggleShare({ fileId: id, clerkId: user.id });
+  const handleOpenShareModal = () => {
     setShowMenu(false);
+    setShowShareModal(true);
   };
+
+  // Check if file is shared with specific members (not whole family)
+  const isSharedWithSome = sharedWith.length > 0 && !sharedWithFamily;
 
   const handleDelete = async () => {
     if (!user) return;
@@ -166,6 +181,13 @@ export function FileCard({
               Shared with family
             </div>
           )}
+          {isSharedWithSome && isOwner && (
+            <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+              <ShareIcon className="h-3 w-3" />
+              Shared with {sharedWith.length}{" "}
+              {sharedWith.length === 1 ? "person" : "people"}
+            </div>
+          )}
           {uploaderName && !isOwner && (
             <p className="mt-2 text-xs text-gray-400">From {uploaderName}</p>
           )}
@@ -224,11 +246,13 @@ export function FileCard({
               {isOwner && (
                 <>
                   <button
-                    onClick={handleToggleShareWithFamily}
+                    onClick={handleOpenShareModal}
                     className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100"
                   >
                     <ShareIcon className="h-4 w-4" />
-                    {sharedWithFamily ? "Unshare with family" : "Share with family"}
+                    {sharedWithFamily || isSharedWithSome
+                      ? "Manage sharing"
+                      : "Share with family"}
                   </button>
                   <hr className="my-1 border-gray-100" />
                   <button
@@ -276,6 +300,19 @@ export function FileCard({
           </Button>
         </div>
       </Modal>
+
+      {/* Share modal */}
+      {isOwner && (
+        <ShareModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          fileId={id}
+          fileName={name}
+          sharedWithFamily={sharedWithFamily}
+          sharedWith={sharedWith}
+          familyMembers={familyMembers}
+        />
+      )}
     </>
   );
 }

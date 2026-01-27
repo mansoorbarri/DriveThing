@@ -175,7 +175,9 @@ export default function DashboardPage() {
                     size={file.size}
                     createdAt={file.createdAt}
                     sharedWithFamily={file.sharedWithFamily}
+                    sharedWith={file.sharedWith ?? []}
                     isOwner={true}
+                    familyMembers={members}
                   />
                 ))}
               </div>
@@ -209,8 +211,10 @@ export default function DashboardPage() {
                     size={file.size}
                     createdAt={file.createdAt}
                     sharedWithFamily={file.sharedWithFamily}
+                    sharedWith={file.sharedWith ?? []}
                     isOwner={false}
                     uploaderName={file.uploaderName}
+                    familyMembers={members}
                   />
                 ))}
               </div>

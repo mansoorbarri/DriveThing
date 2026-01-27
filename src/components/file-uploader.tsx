@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
+import imageCompression from "browser-image-compression";
 import { useUploadThing } from "~/lib/uploadthing-hooks";
 import { useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
@@ -9,29 +10,73 @@ import { api } from "../../convex/_generated/api";
 import { cn } from "~/lib/utils";
 import { formatFileSize } from "~/lib/utils";
 import { UploadIcon, CheckIcon } from "./icons";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 
 interface FileUploaderProps {
   onClose?: () => void;
 }
 
+interface PendingFile {
+  file: File;
+  customName: string;
+  originalName: string;
+}
+
 interface UploadingFile {
   file: File;
+  customName: string;
+  originalName: string;
   progress: number;
-  status: "uploading" | "saving" | "done" | "error";
+  status: "compressing" | "uploading" | "saving" | "done" | "error";
   error?: string;
+}
+
+// Convert custom name to filename format (e.g., "National Insurance" -> "National-Insurance")
+function formatFileName(customName: string, extension: string): string {
+  return (
+    customName
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-zA-Z0-9-]/g, "") + extension
+  );
+}
+
+// Get file extension
+function getExtension(filename: string): string {
+  const lastDot = filename.lastIndexOf(".");
+  return lastDot !== -1 ? filename.slice(lastDot) : "";
+}
+
+// Compress image to under 1MB
+async function compressImage(file: File): Promise<File> {
+  const options = {
+    maxSizeMB: 0.95, // Slightly under 1MB to be safe
+    maxWidthOrHeight: 2048,
+    useWebWorker: true,
+    fileType: file.type as "image/jpeg" | "image/png" | "image/webp",
+  };
+
+  try {
+    const compressedFile = await imageCompression(file, options);
+    return compressedFile;
+  } catch {
+    // If compression fails, return original
+    return file;
+  }
 }
 
 export function FileUploader({ onClose }: FileUploaderProps) {
   const { user } = useUser();
-  const [files, setFiles] = useState<UploadingFile[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
   const createFile = useMutation(api.files.createFile);
 
   const { startUpload, isUploading } = useUploadThing("fileUploader", {
     onUploadProgress: (progress) => {
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.status === "uploading" ? { ...f, progress } : f
-        )
+      setUploadingFiles((prev) =>
+        prev.map((f) => (f.status === "uploading" ? { ...f, progress } : f))
       );
     },
     onClientUploadComplete: async (results) => {
@@ -39,15 +84,21 @@ export function FileUploader({ onClose }: FileUploaderProps) {
 
       // Save each file to Convex
       for (const result of results) {
-        setFiles((prev) =>
+        // Find the matching uploading file
+        const uploadingFile = uploadingFiles.find(
+          (f) => f.customName === result.name
+        );
+
+        setUploadingFiles((prev) =>
           prev.map((f) =>
-            f.file.name === result.name ? { ...f, status: "saving" } : f
+            f.customName === result.name ? { ...f, status: "saving" } : f
           )
         );
 
         try {
           await createFile({
-            name: result.name,
+            name: uploadingFile?.customName ?? result.name,
+            originalName: uploadingFile?.originalName ?? result.name,
             url: result.url,
             fileKey: result.key,
             type: result.type,
@@ -55,15 +106,15 @@ export function FileUploader({ onClose }: FileUploaderProps) {
             clerkId: user.id,
           });
 
-          setFiles((prev) =>
+          setUploadingFiles((prev) =>
             prev.map((f) =>
-              f.file.name === result.name ? { ...f, status: "done" } : f
+              f.customName === result.name ? { ...f, status: "done" } : f
             )
           );
         } catch {
-          setFiles((prev) =>
+          setUploadingFiles((prev) =>
             prev.map((f) =>
-              f.file.name === result.name
+              f.customName === result.name
                 ? { ...f, status: "error", error: "Failed to save file" }
                 : f
             )
@@ -72,9 +123,9 @@ export function FileUploader({ onClose }: FileUploaderProps) {
       }
     },
     onUploadError: (error) => {
-      setFiles((prev) =>
+      setUploadingFiles((prev) =>
         prev.map((f) =>
-          f.status === "uploading"
+          f.status === "uploading" || f.status === "compressing"
             ? { ...f, status: "error", error: error.message }
             : f
         )
@@ -82,28 +133,95 @@ export function FileUploader({ onClose }: FileUploaderProps) {
     },
   });
 
-  const handleDrop = useCallback(
-    (acceptedFiles: File[]) => {
-      if (acceptedFiles.length === 0) return;
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length === 0) return;
 
-      // Add files to state
-      setFiles((prev) => [
-        ...prev,
-        ...acceptedFiles.map((file) => ({
-          file,
-          progress: 0,
-          status: "uploading" as const,
-        })),
-      ]);
+    // Add files to pending with default names
+    const newPendingFiles = acceptedFiles.map((file) => ({
+      file,
+      customName: file.name.replace(/\.[^/.]+$/, ""), // Remove extension for display
+      originalName: file.name,
+    }));
 
-      // Start upload (fire and forget)
-      void startUpload(acceptedFiles);
-    },
-    [startUpload]
-  );
+    setPendingFiles((prev) => [...prev, ...newPendingFiles]);
+  }, []);
+
+  const updateFileName = (index: number, newName: string) => {
+    setPendingFiles((prev) =>
+      prev.map((f, i) => (i === index ? { ...f, customName: newName } : f))
+    );
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpload = async () => {
+    if (pendingFiles.length === 0) return;
+
+    setIsProcessing(true);
+
+    // Process and compress files
+    const processedFiles: UploadingFile[] = [];
+
+    for (const pending of pendingFiles) {
+      const extension = getExtension(pending.originalName);
+      const formattedName = formatFileName(pending.customName, extension);
+
+      // Add to uploading state as compressing
+      const uploadingFile: UploadingFile = {
+        file: pending.file,
+        customName: formattedName,
+        originalName: pending.originalName,
+        progress: 0,
+        status: "compressing",
+      };
+      processedFiles.push(uploadingFile);
+    }
+
+    setUploadingFiles(processedFiles);
+    setPendingFiles([]);
+
+    // Compress images and prepare files
+    const filesToUpload: File[] = [];
+
+    for (let i = 0; i < processedFiles.length; i++) {
+      const uploadingFile = processedFiles[i]!;
+      let fileToUpload = uploadingFile.file;
+
+      // Compress if it's an image and over 1MB
+      if (
+        uploadingFile.file.type.startsWith("image/") &&
+        uploadingFile.file.size > 1024 * 1024
+      ) {
+        try {
+          fileToUpload = await compressImage(uploadingFile.file);
+        } catch {
+          // Use original if compression fails
+        }
+      }
+
+      // Create a new file with the formatted name
+      const renamedFile = new File([fileToUpload], uploadingFile.customName, {
+        type: fileToUpload.type,
+      });
+
+      filesToUpload.push(renamedFile);
+
+      // Update status to uploading
+      setUploadingFiles((prev) =>
+        prev.map((f, idx) => (idx === i ? { ...f, status: "uploading" } : f))
+      );
+    }
+
+    setIsProcessing(false);
+
+    // Start upload
+    void startUpload(filesToUpload);
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop: handleDrop,
+    onDrop,
     accept: {
       "application/pdf": [".pdf"],
       "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp"],
@@ -112,55 +230,133 @@ export function FileUploader({ onClose }: FileUploaderProps) {
         ".xlsx",
       ],
     },
-    maxSize: 64 * 1024 * 1024, // 64MB
-    disabled: isUploading,
+    maxSize: 64 * 1024 * 1024, // 64MB (will be compressed if image)
+    disabled: isUploading || isProcessing,
   });
 
-  const allDone = files.length > 0 && files.every((f) => f.status === "done");
+  const allDone =
+    uploadingFiles.length > 0 && uploadingFiles.every((f) => f.status === "done");
+  const hasUploading = uploadingFiles.some(
+    (f) =>
+      f.status === "uploading" ||
+      f.status === "compressing" ||
+      f.status === "saving"
+  );
 
   return (
-    <div className="p-4">
-      {/* Dropzone */}
-      <div
-        {...getRootProps()}
-        className={cn(
-          "cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors",
-          isDragActive
-            ? "border-blue-500 bg-blue-50"
-            : "border-gray-300 hover:border-gray-400 hover:bg-gray-50",
-          isUploading && "cursor-not-allowed opacity-50"
-        )}
-      >
-        <input {...getInputProps()} />
-        <UploadIcon className="mx-auto h-10 w-10 text-gray-400" />
-        <p className="mt-3 text-base font-medium text-gray-700">
-          {isDragActive ? "Drop files here" : "Drag and drop files here"}
-        </p>
-        <p className="mt-1 text-sm text-gray-500">
-          or tap to select files
-        </p>
-        <p className="mt-3 text-xs text-gray-400">
-          PDF, images, and Excel files up to 64MB
-        </p>
-      </div>
+    <div className="space-y-4">
+      {/* Dropzone - only show if no pending files */}
+      {pendingFiles.length === 0 && uploadingFiles.length === 0 && (
+        <div
+          {...getRootProps()}
+          className={cn(
+            "cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors",
+            isDragActive
+              ? "border-blue-500 bg-blue-50"
+              : "border-gray-300 hover:border-gray-400 hover:bg-gray-50",
+            (isUploading || isProcessing) && "cursor-not-allowed opacity-50"
+          )}
+        >
+          <input {...getInputProps()} />
+          <UploadIcon className="mx-auto h-10 w-10 text-gray-400" />
+          <p className="mt-3 text-base font-medium text-gray-700">
+            {isDragActive ? "Drop files here" : "Drag and drop files here"}
+          </p>
+          <p className="mt-1 text-sm text-gray-500">or tap to select files</p>
+          <p className="mt-3 text-xs text-gray-400">
+            PDF, images, and Excel files. Images over 1MB will be compressed.
+          </p>
+        </div>
+      )}
+
+      {/* Pending files - name entry */}
+      {pendingFiles.length > 0 && (
+        <div className="space-y-4">
+          <p className="text-sm font-medium text-gray-700">
+            Name your files (e.g., &quot;National Insurance&quot;, &quot;Passport
+            Scan&quot;)
+          </p>
+          {pendingFiles.map((pending, index) => (
+            <div key={index} className="rounded-lg border border-gray-200 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-xs text-gray-500">
+                  {pending.originalName} ({formatFileSize(pending.file.size)})
+                </span>
+                <button
+                  onClick={() => removePendingFile(index)}
+                  className="text-xs text-red-600 hover:text-red-700"
+                >
+                  Remove
+                </button>
+              </div>
+              <Input
+                placeholder="What is this file?"
+                value={pending.customName}
+                onChange={(e) => updateFileName(index, e.target.value)}
+                autoFocus={index === 0}
+              />
+              <p className="mt-1.5 text-xs text-gray-400">
+                Will be saved as:{" "}
+                {formatFileName(
+                  pending.customName,
+                  getExtension(pending.originalName)
+                )}
+              </p>
+            </div>
+          ))}
+
+          <div className="flex gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setPendingFiles([])}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpload}
+              disabled={
+                pendingFiles.some((f) => !f.customName.trim()) || isProcessing
+              }
+              loading={isProcessing}
+              className="flex-1"
+            >
+              Upload {pendingFiles.length} file
+              {pendingFiles.length > 1 ? "s" : ""}
+            </Button>
+          </div>
+
+          {/* Add more files */}
+          <div
+            {...getRootProps()}
+            className="cursor-pointer rounded-lg border border-dashed border-gray-300 p-3 text-center text-sm text-gray-500 hover:bg-gray-50"
+          >
+            <input {...getInputProps()} />
+            + Add more files
+          </div>
+        </div>
+      )}
 
       {/* Upload progress */}
-      {files.length > 0 && (
-        <div className="mt-4 space-y-2">
-          {files.map((f, i) => (
+      {uploadingFiles.length > 0 && (
+        <div className="space-y-2">
+          {uploadingFiles.map((f, i) => (
             <div
               key={i}
               className="flex items-center gap-3 rounded-lg bg-gray-50 p-3"
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-gray-900">
-                  {f.file.name}
+                  {f.customName}
                 </p>
                 <p className="text-xs text-gray-500">
                   {formatFileSize(f.file.size)}
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                {f.status === "compressing" && (
+                  <span className="text-xs text-gray-500">Compressing...</span>
+                )}
                 {f.status === "uploading" && (
                   <div className="h-2 w-16 overflow-hidden rounded-full bg-gray-200">
                     <div
@@ -186,12 +382,16 @@ export function FileUploader({ onClose }: FileUploaderProps) {
 
       {/* Done button */}
       {allDone && onClose && (
-        <button
-          onClick={onClose}
-          className="mt-4 w-full rounded-lg bg-blue-600 py-2.5 font-medium text-white hover:bg-blue-700"
-        >
+        <Button onClick={onClose} className="w-full">
           Done
-        </button>
+        </Button>
+      )}
+
+      {/* Uploading indicator */}
+      {hasUploading && (
+        <p className="text-center text-sm text-gray-500">
+          Please wait while your files are being uploaded...
+        </p>
       )}
     </div>
   );
