@@ -95,8 +95,8 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
   // Use ref to store metadata to avoid closure issues in callbacks
   const uploadMetadataRef = useRef<Map<string, UploadMetadata>>(new Map());
 
-  // Get non-owner members for assignment
-  const assignableMembers = familyMembers.filter((m) => m.role !== "owner");
+  // All family members (including owner) can be assigned files
+  const assignableMembers = familyMembers;
 
   const { startUpload, isUploading } = useUploadThing("fileUploader", {
     onUploadProgress: (progress) => {
@@ -391,6 +391,7 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
                     {assignableMembers.map((member) => (
                       <option key={member._id} value={member._id}>
                         {member.name}
+                        {member.role === "owner" ? " (Me)" : ""}
                       </option>
                     ))}
                   </select>
