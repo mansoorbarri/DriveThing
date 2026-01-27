@@ -364,6 +364,7 @@ export function FileUploader({
           <p className="text-sm font-medium text-zinc-300">
             Name your files and assign to family members
           </p>
+          <div className="max-h-[400px] space-y-4 overflow-y-auto pr-1">
           {pendingFiles.map((pending, index) => (
             <div
               key={index}
@@ -496,6 +497,7 @@ export function FileUploader({
               </div>
             </div>
           ))}
+          </div>
 
           <div className="flex gap-3">
             <Button
