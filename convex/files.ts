@@ -87,7 +87,9 @@ export const getAllFamilyFiles = query({
   },
 });
 
-// Get files assigned to current user (for members)
+// Get files for current user
+// - Owners see all files they uploaded
+// - Members see files assigned to them
 export const getMyFiles = query({
   args: { clerkId: v.string() },
   handler: async (ctx, args) => {
@@ -96,47 +98,45 @@ export const getMyFiles = query({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
       .unique();
 
-    if (!user) {
+    if (!user || !user.familyId) {
       return [];
     }
 
-    // If owner, get files they uploaded (for backwards compatibility)
-    if (user.role === "owner") {
-      const files = await ctx.db
-        .query("files")
-        .withIndex("by_uploader", (q) => q.eq("uploadedBy", user._id))
-        .order("desc")
-        .collect();
+    const familyId = user.familyId;
 
-      // Get assigned user info
-      const filesWithAssignee = await Promise.all(
-        files.map(async (file) => {
-          let assigneeName: string | undefined;
-          if (file.assignedTo) {
-            const assignee = await ctx.db.get(file.assignedTo);
-            assigneeName = assignee?.name;
-          }
-          return {
-            ...file,
-            assigneeName,
-          };
-        })
-      );
-
-      return filesWithAssignee;
-    }
-
-    // For members, get files assigned to them
-    const files = await ctx.db
+    // Get all files in the family
+    const allFamilyFiles = await ctx.db
       .query("files")
-      .withIndex("by_assigned", (q) => q.eq("assignedTo", user._id))
+      .withIndex("by_family", (q) => q.eq("familyId", familyId))
       .order("desc")
       .collect();
 
-    return files.map((file) => ({
-      ...file,
-      assigneeName: user.name,
-    }));
+    // Filter based on role
+    let myFiles;
+    if (user.role === "owner") {
+      // Owner sees all files they uploaded
+      myFiles = allFamilyFiles.filter((file) => file.uploadedBy === user._id);
+    } else {
+      // Members see files assigned to them
+      myFiles = allFamilyFiles.filter((file) => file.assignedTo === user._id);
+    }
+
+    // Get assigned user info for each file
+    const filesWithAssignee = await Promise.all(
+      myFiles.map(async (file) => {
+        let assigneeName: string | undefined;
+        if (file.assignedTo) {
+          const assignee = await ctx.db.get(file.assignedTo);
+          assigneeName = assignee?.name;
+        }
+        return {
+          ...file,
+          assigneeName,
+        };
+      })
+    );
+
+    return filesWithAssignee;
   },
 });
 
