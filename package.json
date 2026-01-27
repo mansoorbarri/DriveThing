@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.36.10",
+    "@clerk/themes": "^2.4.50",
     "@t3-oss/env-nextjs": "^0.12.0",
     "@uploadthing/react": "^7.3.3",
     "browser-image-compression": "^2.0.2",

@@ -106,7 +106,7 @@ export function ShareModal({
           className={cn(
             "flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-colors",
             shareWithAll
-              ? "border-blue-500 bg-blue-500/10"
+              ? "border-violet-500 bg-violet-500/10"
               : "border-zinc-700 hover:bg-zinc-800"
           )}
         >
@@ -114,7 +114,7 @@ export function ShareModal({
             className={cn(
               "flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium",
               shareWithAll
-                ? "bg-blue-600 text-white"
+                ? "bg-violet-600 text-white"
                 : "bg-zinc-800 text-zinc-400"
             )}
           >
@@ -126,7 +126,7 @@ export function ShareModal({
               All {familyMembers.length} members can see this file
             </p>
           </div>
-          {shareWithAll && <CheckIcon className="h-5 w-5 text-blue-400" />}
+          {shareWithAll && <CheckIcon className="h-5 w-5 text-violet-400" />}
         </button>
 
         {/* Individual members */}
@@ -144,7 +144,7 @@ export function ShareModal({
                   className={cn(
                     "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
                     isSelected
-                      ? "border-blue-500 bg-blue-500/10"
+                      ? "border-violet-500 bg-violet-500/10"
                       : "border-zinc-700 hover:bg-zinc-800"
                   )}
                 >
@@ -152,7 +152,7 @@ export function ShareModal({
                     className={cn(
                       "flex h-9 w-9 items-center justify-center rounded-full text-sm font-medium",
                       isSelected
-                        ? "bg-blue-600 text-white"
+                        ? "bg-violet-600 text-white"
                         : "bg-zinc-800 text-zinc-400"
                     )}
                   >
@@ -166,7 +166,7 @@ export function ShareModal({
                       {member.email}
                     </p>
                   </div>
-                  {isSelected && <CheckIcon className="h-5 w-5 text-blue-400" />}
+                  {isSelected && <CheckIcon className="h-5 w-5 text-violet-400" />}
                 </button>
               );
             })}

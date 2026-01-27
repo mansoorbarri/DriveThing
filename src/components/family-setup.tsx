@@ -61,8 +61,8 @@ export function FamilySetup() {
     return (
       <div className="mx-auto max-w-md px-4 py-12">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/20">
-            <FamilyIcon className="h-8 w-8 text-blue-400" />
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-violet-500/20">
+            <FamilyIcon className="h-8 w-8 text-violet-400" />
           </div>
           <h1 className="text-2xl font-bold text-zinc-100">Welcome!</h1>
           <p className="mt-2 text-zinc-400">
@@ -75,8 +75,8 @@ export function FamilySetup() {
             onClick={() => setMode("create")}
             className="flex w-full items-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-colors hover:bg-zinc-800"
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/20">
-              <PlusIcon className="h-6 w-6 text-blue-400" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-500/20">
+              <PlusIcon className="h-6 w-6 text-violet-400" />
             </div>
             <div>
               <p className="font-medium text-zinc-100">Create a family</p>

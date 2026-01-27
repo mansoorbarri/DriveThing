@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import imageCompression from "browser-image-compression";
 import { useUploadThing } from "~/lib/uploadthing-hooks";
@@ -35,14 +35,19 @@ interface PendingFile {
 }
 
 interface UploadingFile {
-  file: File;
   customName: string;
   originalName: string;
-  assignedTo?: Id<"users">;
-  tags: string[];
+  size: number;
   progress: number;
   status: "compressing" | "uploading" | "saving" | "done" | "error";
   error?: string;
+}
+
+// Metadata stored in ref to avoid closure issues
+interface UploadMetadata {
+  originalName: string;
+  assignedTo?: Id<"users">;
+  tags: string[];
 }
 
 // Convert custom name to filename format (e.g., "National Insurance" -> "National-Insurance")
@@ -84,8 +89,11 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [tagInput, setTagInput] = useState<{ [key: number]: string }>({});
+  const [tagInput, setTagInput] = useState<Record<number, string>>({});
   const createFile = useMutation(api.files.createFile);
+
+  // Use ref to store metadata to avoid closure issues in callbacks
+  const uploadMetadataRef = useRef<Map<string, UploadMetadata>>(new Map());
 
   // Get non-owner members for assignment
   const assignableMembers = familyMembers.filter((m) => m.role !== "owner");
@@ -101,10 +109,8 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
 
       // Save each file to Convex
       for (const result of results) {
-        // Find the matching uploading file
-        const uploadingFile = uploadingFiles.find(
-          (f) => f.customName === result.name
-        );
+        // Get metadata from ref (not from state to avoid closure issues)
+        const metadata = uploadMetadataRef.current.get(result.name);
 
         setUploadingFiles((prev) =>
           prev.map((f) =>
@@ -114,15 +120,15 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
 
         try {
           await createFile({
-            name: uploadingFile?.customName ?? result.name,
-            originalName: uploadingFile?.originalName ?? result.name,
+            name: result.name,
+            originalName: metadata?.originalName ?? result.name,
             url: result.url,
             fileKey: result.key,
             type: result.type,
             size: result.size,
             clerkId: user.id,
-            assignedTo: uploadingFile?.assignedTo,
-            tags: uploadingFile?.tags ?? [],
+            assignedTo: metadata?.assignedTo,
+            tags: metadata?.tags ?? [],
           });
 
           setUploadingFiles((prev) =>
@@ -140,6 +146,9 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
           );
         }
       }
+
+      // Clear metadata ref after upload completes
+      uploadMetadataRef.current.clear();
     },
     onUploadError: (error) => {
       setUploadingFiles((prev) =>
@@ -210,60 +219,62 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
 
     setIsProcessing(true);
 
+    // Clear previous metadata
+    uploadMetadataRef.current.clear();
+
     // Process and compress files
     const processedFiles: UploadingFile[] = [];
+    const filesToUpload: File[] = [];
 
     for (const pending of pendingFiles) {
       const extension = getExtension(pending.originalName);
       const formattedName = formatFileName(pending.customName, extension);
 
-      // Add to uploading state as compressing
-      const uploadingFile: UploadingFile = {
-        file: pending.file,
-        customName: formattedName,
+      // Store metadata in ref for later use in callback
+      uploadMetadataRef.current.set(formattedName, {
         originalName: pending.originalName,
         assignedTo: pending.assignedTo,
         tags: pending.tags,
+      });
+
+      // Add to uploading state as compressing
+      const uploadingFile: UploadingFile = {
+        customName: formattedName,
+        originalName: pending.originalName,
+        size: pending.file.size,
         progress: 0,
         status: "compressing",
       };
       processedFiles.push(uploadingFile);
-    }
-
-    setUploadingFiles(processedFiles);
-    setPendingFiles([]);
-
-    // Compress images and prepare files
-    const filesToUpload: File[] = [];
-
-    for (let i = 0; i < processedFiles.length; i++) {
-      const uploadingFile = processedFiles[i]!;
-      let fileToUpload = uploadingFile.file;
 
       // Compress if it's an image and over 1MB
+      let fileToUpload = pending.file;
       if (
-        uploadingFile.file.type.startsWith("image/") &&
-        uploadingFile.file.size > 1024 * 1024
+        pending.file.type.startsWith("image/") &&
+        pending.file.size > 1024 * 1024
       ) {
         try {
-          fileToUpload = await compressImage(uploadingFile.file);
+          fileToUpload = await compressImage(pending.file);
         } catch {
           // Use original if compression fails
         }
       }
 
       // Create a new file with the formatted name
-      const renamedFile = new File([fileToUpload], uploadingFile.customName, {
+      const renamedFile = new File([fileToUpload], formattedName, {
         type: fileToUpload.type,
       });
 
       filesToUpload.push(renamedFile);
-
-      // Update status to uploading
-      setUploadingFiles((prev) =>
-        prev.map((f, idx) => (idx === i ? { ...f, status: "uploading" } : f))
-      );
     }
+
+    setUploadingFiles(processedFiles);
+    setPendingFiles([]);
+
+    // Update all to uploading status
+    setUploadingFiles((prev) =>
+      prev.map((f) => ({ ...f, status: "uploading" as const }))
+    );
 
     setIsProcessing(false);
 
@@ -303,7 +314,7 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
           className={cn(
             "cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors",
             isDragActive
-              ? "border-blue-500 bg-blue-500/10"
+              ? "border-violet-500 bg-violet-500/10"
               : "border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800/50",
             (isUploading || isProcessing) && "cursor-not-allowed opacity-50"
           )}
@@ -362,7 +373,7 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
               {assignableMembers.length > 0 && (
                 <div className="mt-4">
                   <label className="mb-1.5 block text-sm font-medium text-zinc-400">
-                    Assign to (optional)
+                    Assign to
                   </label>
                   <select
                     value={pending.assignedTo ?? ""}
@@ -374,9 +385,9 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
                           : undefined
                       )
                     }
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
                   >
-                    <option value="">No one (family documents)</option>
+                    <option value="">Unassigned (family documents)</option>
                     {assignableMembers.map((member) => (
                       <option key={member._id} value={member._id}>
                         {member.name}
@@ -395,12 +406,12 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
                   {pending.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="inline-flex items-center gap-1 rounded-full bg-blue-500/20 px-2.5 py-1 text-xs font-medium text-blue-400"
+                      className="inline-flex items-center gap-1 rounded-full bg-violet-500/20 px-2.5 py-1 text-xs font-medium text-violet-400"
                     >
                       {tag}
                       <button
                         onClick={() => removeTag(index, tag)}
-                        className="hover:text-blue-200"
+                        className="hover:text-violet-200"
                       >
                         <CloseIcon className="h-3 w-3" />
                       </button>
@@ -420,7 +431,7 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
                       }
                     }}
                     onBlur={() => addTag(index, tagInput[index] ?? "")}
-                    className="min-w-[100px] flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-blue-500 focus:outline-none"
+                    className="min-w-[100px] flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500 focus:outline-none"
                   />
                 </div>
                 <p className="mt-1 text-xs text-zinc-600">
@@ -475,7 +486,7 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
                   {f.customName}
                 </p>
                 <p className="text-xs text-zinc-500">
-                  {formatFileSize(f.file.size)}
+                  {formatFileSize(f.size)}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -485,7 +496,7 @@ export function FileUploader({ onClose, familyMembers }: FileUploaderProps) {
                 {f.status === "uploading" && (
                   <div className="h-2 w-16 overflow-hidden rounded-full bg-zinc-700">
                     <div
-                      className="h-full bg-blue-500 transition-all"
+                      className="h-full bg-violet-500 transition-all"
                       style={{ width: `${f.progress}%` }}
                     />
                   </div>

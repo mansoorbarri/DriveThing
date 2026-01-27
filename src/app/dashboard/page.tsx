@@ -11,7 +11,11 @@ import { FamilySetup } from "~/components/family-setup";
 import { FamilySettings } from "~/components/family-settings";
 import { EmptyState } from "~/components/ui/empty-state";
 import { Modal } from "~/components/ui/modal";
-import { FileGridSkeleton } from "~/components/ui/skeleton";
+import {
+  FileGridSkeleton,
+  DashboardSkeleton,
+  GroupedFilesSkeleton,
+} from "~/components/ui/skeleton";
 import { PlusIcon, FileIcon, UploadIcon } from "~/components/icons";
 import { cn } from "~/lib/utils";
 
@@ -67,6 +71,43 @@ export default function DashboardPage() {
     );
   }, [myFiles, searchQuery]);
 
+  // Group files by assignee for owner view
+  const groupedFiles = useMemo(() => {
+    if (!filteredMyFiles || !userWithFamily) return null;
+
+    const currentUserRole = userWithFamily.user?.role;
+    if (currentUserRole !== "owner") return null;
+
+    const familyMembers = userWithFamily.members;
+    const groups: Record<string, typeof filteredMyFiles> = {
+      unassigned: [],
+    };
+
+    // Create groups for each member
+    familyMembers.forEach((m) => {
+      if (m.role !== "owner") {
+        groups[m._id] = [];
+      }
+    });
+
+    // Sort files into groups
+    filteredMyFiles.forEach((file) => {
+      if (file.assignedTo) {
+        const targetGroup = groups[file.assignedTo];
+        if (targetGroup) {
+          targetGroup.push(file);
+        } else {
+          // Assigned to someone not in members list (edge case)
+          groups.unassigned?.push(file);
+        }
+      } else {
+        groups.unassigned?.push(file);
+      }
+    });
+
+    return groups;
+  }, [filteredMyFiles, userWithFamily]);
+
   const filteredSharedFiles = useMemo(() => {
     if (!sharedFiles) return [];
     if (!searchQuery) return sharedFiles;
@@ -80,11 +121,7 @@ export default function DashboardPage() {
 
   // Loading state
   if (!isLoaded || userWithFamily === undefined) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0a0b]">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   // Not in a family yet - show setup
@@ -148,7 +185,11 @@ export default function DashboardPage() {
         {activeTab === "my-files" && (
           <>
             {myFiles === undefined ? (
-              <FileGridSkeleton />
+              isOwner ? (
+                <GroupedFilesSkeleton />
+              ) : (
+                <FileGridSkeleton />
+              )
             ) : filteredMyFiles.length === 0 ? (
               <EmptyState
                 icon={<FileIcon className="h-8 w-8" />}
@@ -165,7 +206,7 @@ export default function DashboardPage() {
                   isOwner && (
                     <button
                       onClick={() => setShowUploader(true)}
-                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-500"
+                      className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 font-medium text-white hover:bg-violet-500"
                     >
                       <UploadIcon className="h-5 w-5" />
                       Upload files
@@ -173,7 +214,74 @@ export default function DashboardPage() {
                   )
                 }
               />
+            ) : isOwner && groupedFiles ? (
+              // Grouped view for owners
+              <div className="space-y-8">
+                {/* Unassigned files */}
+                {(groupedFiles.unassigned?.length ?? 0) > 0 && (
+                  <div>
+                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
+                      Family Documents ({groupedFiles.unassigned?.length ?? 0})
+                    </h3>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {groupedFiles.unassigned?.map((file) => (
+                        <FileCard
+                          key={file._id}
+                          id={file._id}
+                          name={file.name}
+                          url={file.url}
+                          type={file.type}
+                          size={file.size}
+                          createdAt={file.createdAt}
+                          sharedWithFamily={file.sharedWithFamily}
+                          sharedWith={file.sharedWith ?? []}
+                          tags={file.tags ?? []}
+                          assignedTo={file.assignedTo}
+                          assigneeName={file.assigneeName}
+                          isOwner={isOwner}
+                          familyMembers={members}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Files grouped by member */}
+                {members
+                  .filter((m) => m.role !== "owner")
+                  .map((member) => {
+                    const memberFiles = groupedFiles[member._id] ?? [];
+                    if (memberFiles.length === 0) return null;
+                    return (
+                      <div key={member._id}>
+                        <h3 className="mb-4 text-sm font-medium text-zinc-400">
+                          {member.name}&apos;s Files ({memberFiles.length})
+                        </h3>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {memberFiles.map((file) => (
+                            <FileCard
+                              key={file._id}
+                              id={file._id}
+                              name={file.name}
+                              url={file.url}
+                              type={file.type}
+                              size={file.size}
+                              createdAt={file.createdAt}
+                              sharedWithFamily={file.sharedWithFamily}
+                              sharedWith={file.sharedWith ?? []}
+                              tags={file.tags ?? []}
+                              assignedTo={file.assignedTo}
+                              assigneeName={file.assigneeName}
+                              isOwner={isOwner}
+                              familyMembers={members}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
             ) : (
+              // Simple grid for members
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredMyFiles.map((file) => (
                   <FileCard
@@ -187,6 +295,7 @@ export default function DashboardPage() {
                     sharedWithFamily={file.sharedWithFamily}
                     sharedWith={file.sharedWith ?? []}
                     tags={file.tags ?? []}
+                    assignedTo={file.assignedTo}
                     assigneeName={file.assigneeName}
                     isOwner={isOwner}
                     familyMembers={members}
@@ -225,6 +334,7 @@ export default function DashboardPage() {
                     sharedWithFamily={file.sharedWithFamily}
                     sharedWith={file.sharedWith ?? []}
                     tags={file.tags ?? []}
+                    assignedTo={file.assignedTo}
                     assigneeName={file.assigneeName}
                     isOwner={false}
                     uploaderName={file.uploaderName}
@@ -242,8 +352,8 @@ export default function DashboardPage() {
         <button
           onClick={() => setShowUploader(true)}
           className={cn(
-            "fixed bottom-6 right-6 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg",
-            "hover:bg-blue-500 active:bg-blue-700 transition-colors",
+            "fixed bottom-6 right-6 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-violet-600 text-white shadow-lg",
+            "hover:bg-violet-500 active:bg-violet-700 transition-colors",
             "md:bottom-8 md:right-8"
           )}
           aria-label="Upload files"

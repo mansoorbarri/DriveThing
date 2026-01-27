@@ -22,6 +22,7 @@ import {
   TrashIcon,
   DownloadIcon,
   MoreIcon,
+  UserIcon,
 } from "./icons";
 import { Button } from "./ui/button";
 import { Modal } from "./ui/modal";
@@ -45,6 +46,7 @@ interface FileCardProps {
   sharedWithFamily: boolean;
   sharedWith?: Id<"users">[];
   tags?: string[];
+  assignedTo?: Id<"users">;
   assigneeName?: string;
   isOwner: boolean;
   uploaderName?: string;
@@ -61,6 +63,7 @@ export function FileCard({
   sharedWithFamily,
   sharedWith = [],
   tags = [],
+  assignedTo,
   assigneeName,
   isOwner,
   uploaderName,
@@ -70,13 +73,19 @@ export function FileCard({
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showReassignModal, setShowReassignModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isReassigning, setIsReassigning] = useState(false);
   const [shareStatus, setShareStatus] = useState<"idle" | "shared" | "copied">(
     "idle"
   );
   const [imageError, setImageError] = useState(false);
 
   const deleteFile = useMutation(api.files.deleteFile);
+  const updateAssignment = useMutation(api.files.updateFileAssignment);
+
+  // Get non-owner members for assignment
+  const assignableMembers = familyMembers.filter((m) => m.role !== "owner");
 
   const fileIcon = getFileIcon(type);
   const isImage = type.startsWith("image/");
@@ -96,6 +105,26 @@ export function FileCard({
     setShowShareModal(true);
   };
 
+  const handleOpenReassignModal = () => {
+    setShowMenu(false);
+    setShowReassignModal(true);
+  };
+
+  const handleReassign = async (newAssignee?: Id<"users">) => {
+    if (!user) return;
+    setIsReassigning(true);
+    try {
+      await updateAssignment({
+        fileId: id,
+        clerkId: user.id,
+        assignedTo: newAssignee,
+      });
+      setShowReassignModal(false);
+    } finally {
+      setIsReassigning(false);
+    }
+  };
+
   // Check if file is shared with specific members (not whole family)
   const isSharedWithSome = sharedWith.length > 0 && !sharedWithFamily;
 
@@ -103,7 +132,17 @@ export function FileCard({
     if (!user) return;
     setIsDeleting(true);
     try {
-      await deleteFile({ fileId: id, clerkId: user.id });
+      // Delete from Convex DB and get the file key
+      const result = await deleteFile({ fileId: id, clerkId: user.id });
+
+      // Delete from UploadThing storage
+      if (result?.fileKey) {
+        await fetch("/api/uploadthing/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileKey: result.fileKey }),
+        });
+      }
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
@@ -132,14 +171,14 @@ export function FileCard({
     image: "text-purple-400 bg-purple-500/20",
     pdf: "text-red-400 bg-red-500/20",
     spreadsheet: "text-green-400 bg-green-500/20",
-    file: "text-blue-400 bg-blue-500/20",
+    file: "text-violet-400 bg-violet-500/20",
   };
 
   return (
     <>
       <div
         onClick={handleCardClick}
-        className="group relative cursor-pointer overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 transition-all hover:border-zinc-700 hover:bg-zinc-800/50 active:bg-zinc-800"
+        className="group relative cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900 transition-all hover:border-zinc-700 hover:bg-zinc-800/50 active:bg-zinc-800"
       >
         {/* Image preview or icon */}
         {isImage && !imageError ? (
@@ -206,13 +245,13 @@ export function FileCard({
 
           {/* Shared indicator or uploader name */}
           {sharedWithFamily && isOwner && (
-            <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-500/20 px-2 py-0.5 text-xs text-blue-400">
+            <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-violet-500/20 px-2 py-0.5 text-xs text-violet-400">
               <ShareIcon className="h-3 w-3" />
               Shared with family
             </div>
           )}
           {isSharedWithSome && isOwner && (
-            <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-500/20 px-2 py-0.5 text-xs text-blue-400">
+            <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-violet-500/20 px-2 py-0.5 text-xs text-violet-400">
               <ShareIcon className="h-3 w-3" />
               Shared with {sharedWith.length}{" "}
               {sharedWith.length === 1 ? "person" : "people"}
@@ -284,6 +323,15 @@ export function FileCard({
                       ? "Manage sharing"
                       : "Share with family"}
                   </button>
+                  {assignableMembers.length > 0 && (
+                    <button
+                      onClick={handleOpenReassignModal}
+                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
+                    >
+                      <UserIcon className="h-4 w-4" />
+                      {assignedTo ? "Reassign" : "Assign to"}
+                    </button>
+                  )}
                   <hr className="my-1 border-zinc-700" />
                   <button
                     onClick={() => {
@@ -342,6 +390,63 @@ export function FileCard({
           sharedWith={sharedWith}
           familyMembers={familyMembers}
         />
+      )}
+
+      {/* Reassign modal */}
+      {isOwner && (
+        <Modal
+          isOpen={showReassignModal}
+          onClose={() => setShowReassignModal(false)}
+          title="Assign file"
+        >
+          <p className="mb-4 text-sm text-zinc-400">
+            Choose who this file should be assigned to.
+          </p>
+          <div className="space-y-2">
+            <button
+              onClick={() => handleReassign(undefined)}
+              disabled={isReassigning}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
+                !assignedTo
+                  ? "border-violet-500 bg-violet-500/10 text-zinc-100"
+                  : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              )}
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-700 text-zinc-400">
+                <FileIcon className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="font-medium">Unassigned</p>
+                <p className="text-xs text-zinc-500">Family documents</p>
+              </div>
+            </button>
+            {assignableMembers.map((member) => (
+              <button
+                key={member._id}
+                onClick={() => handleReassign(member._id)}
+                disabled={isReassigning}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
+                  assignedTo === member._id
+                    ? "border-violet-500 bg-violet-500/10 text-zinc-100"
+                    : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                )}
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-700 text-zinc-300">
+                  {member.name[0]?.toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-medium">{member.name}</p>
+                  <p className="text-xs text-zinc-500">{member.email}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+          {isReassigning && (
+            <p className="mt-4 text-center text-sm text-zinc-500">Saving...</p>
+          )}
+        </Modal>
       )}
     </>
   );

@@ -117,7 +117,7 @@ export function FamilySettings({
               <button
                 onClick={handleRegenerate}
                 disabled={regenerating}
-                className="mt-2 text-sm text-blue-400 hover:text-blue-300 disabled:opacity-50"
+                className="mt-2 text-sm text-violet-400 hover:text-violet-300 disabled:opacity-50"
               >
                 {regenerating ? "Generating..." : "Generate new code"}
               </button>
