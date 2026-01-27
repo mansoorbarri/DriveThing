@@ -72,8 +72,8 @@ export function FolderCard({
   const updateAssignment = useMutation(api.folders.updateFolderAssignment);
   const updateSharing = useMutation(api.folders.updateFolderSharing);
 
-  // Get non-owner members for assignment
-  const assignableMembers = familyMembers.filter((m) => m.role !== "owner");
+  // All family members (including owner) can be assigned
+  const assignableMembers = familyMembers;
 
   // Check if current user can share this folder (owner OR folder is assigned to them)
   const currentUserEmail = user?.primaryEmailAddress?.emailAddress;
@@ -449,7 +449,10 @@ export function FolderCard({
                   {member.name[0]?.toUpperCase()}
                 </div>
                 <div>
-                  <p className="font-medium">{member.name}</p>
+                  <p className="font-medium">
+                    {member.name}
+                    {member.role === "owner" ? " (Me)" : ""}
+                  </p>
                   <p className="text-xs text-zinc-500">{member.email}</p>
                 </div>
               </button>
