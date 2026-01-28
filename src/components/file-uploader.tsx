@@ -25,7 +25,7 @@ interface FolderOption {
   _id: Id<"folders">;
   name: string;
   parentFolderId?: Id<"folders">;
-  assignedTo?: Id<"users">[];
+  assignedTo?: Id<"users">;
 }
 
 interface FileUploaderProps {
@@ -211,10 +211,10 @@ export function FileUploader({
     return folders.filter((folder) => {
       // If no assignee selected (family/unassigned), show unassigned folders
       if (!assignedTo) {
-        return !folder.assignedTo || folder.assignedTo.length === 0;
+        return !folder.assignedTo;
       }
-      // Otherwise show folders that include that person in their assignees
-      return folder.assignedTo?.includes(assignedTo);
+      // Otherwise show folders assigned to that person
+      return folder.assignedTo === assignedTo;
     });
   };
 

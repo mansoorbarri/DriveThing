@@ -7,7 +7,7 @@ export const createFolder = mutation({
   args: {
     name: v.string(),
     parentFolderId: v.optional(v.id("folders")),
-    assignedTo: v.optional(v.array(v.id("users"))),
+    assignedTo: v.optional(v.id("users")),
     clerkId: v.string(),
   },
   handler: async (ctx, args) => {
@@ -32,14 +32,11 @@ export const createFolder = mutation({
       }
     }
 
-    // Only store non-empty arrays
-    const assignedTo = args.assignedTo && args.assignedTo.length > 0 ? args.assignedTo : undefined;
-
     return await ctx.db.insert("folders", {
       name: args.name,
       parentFolderId: args.parentFolderId,
       createdBy: user._id,
-      assignedTo,
+      assignedTo: args.assignedTo,
       familyId: user.familyId,
       sharedWithFamily: false,
       sharedWith: [],
@@ -164,7 +161,7 @@ export const deleteFolder = mutation({
 export const updateFolderAssignment = mutation({
   args: {
     folderId: v.id("folders"),
-    assignedTo: v.optional(v.array(v.id("users"))),
+    assignedTo: v.optional(v.id("users")),
     clerkId: v.string(),
   },
   handler: async (ctx, args) => {
@@ -186,9 +183,7 @@ export const updateFolderAssignment = mutation({
       throw new Error("Not authorized to update this folder");
     }
 
-    // Only store non-empty arrays
-    const assignedTo = args.assignedTo && args.assignedTo.length > 0 ? args.assignedTo : undefined;
-    await ctx.db.patch(args.folderId, { assignedTo });
+    await ctx.db.patch(args.folderId, { assignedTo: args.assignedTo });
   },
 });
 
@@ -217,7 +212,7 @@ export const updateFolderSharing = mutation({
 
     // Allow if user is owner OR folder is assigned to them
     const canShare =
-      folder.createdBy === user._id || folder.assignedTo?.includes(user._id);
+      folder.createdBy === user._id || folder.assignedTo === user._id;
 
     if (!canShare) {
       throw new Error("Not authorized to share this folder");
@@ -315,19 +310,17 @@ export const getMyFolders = query({
     } else {
       // Members see folders assigned to them + unassigned family folders
       visibleFolders = familyFolders.filter(
-        (f) => f.assignedTo?.includes(user._id) || !f.assignedTo || f.assignedTo.length === 0
+        (f) => f.assignedTo === user._id || !f.assignedTo
       );
     }
 
     // Get assignee info and item counts for each folder
     const foldersWithInfo = await Promise.all(
       visibleFolders.map(async (folder) => {
-        let assigneeNames: string[] = [];
-        if (folder.assignedTo && folder.assignedTo.length > 0) {
-          const assignees = await Promise.all(
-            folder.assignedTo.map((id) => ctx.db.get(id))
-          );
-          assigneeNames = assignees.filter(Boolean).map((a) => a!.name);
+        let assigneeName: string | undefined;
+        if (folder.assignedTo) {
+          const assignee = await ctx.db.get(folder.assignedTo);
+          assigneeName = assignee?.name;
         }
 
         // Count items in folder
@@ -343,7 +336,7 @@ export const getMyFolders = query({
 
         return {
           ...folder,
-          assigneeNames,
+          assigneeName,
           itemCount: filesInFolder.length + subfoldersInFolder.length,
         };
       })
@@ -384,9 +377,9 @@ export const getSharedFolders = query({
       // Exclude folders created by this user (they see those in My Folders)
       if (folder.createdBy === user._id) return false;
       // Exclude folders assigned to this user (they see those in My Folders)
-      if (folder.assignedTo?.includes(user._id)) return false;
+      if (folder.assignedTo === user._id) return false;
       // Exclude unassigned folders (everyone sees those in My Folders)
-      if (!folder.assignedTo || folder.assignedTo.length === 0) return false;
+      if (!folder.assignedTo) return false;
       // Include if shared with family
       if (folder.sharedWithFamily) return true;
       // Include if shared with this user specifically
@@ -397,12 +390,10 @@ export const getSharedFolders = query({
     // Get assignee info and item counts
     const foldersWithInfo = await Promise.all(
       sharedFolders.map(async (folder) => {
-        let assigneeNames: string[] = [];
-        if (folder.assignedTo && folder.assignedTo.length > 0) {
-          const assignees = await Promise.all(
-            folder.assignedTo.map((id) => ctx.db.get(id))
-          );
-          assigneeNames = assignees.filter(Boolean).map((a) => a!.name);
+        let assigneeName: string | undefined;
+        if (folder.assignedTo) {
+          const assignee = await ctx.db.get(folder.assignedTo);
+          assigneeName = assignee?.name;
         }
 
         const creator = await ctx.db.get(folder.createdBy);
@@ -420,7 +411,7 @@ export const getSharedFolders = query({
 
         return {
           ...folder,
-          assigneeNames,
+          assigneeName,
           creatorName: creator?.name ?? "Unknown",
           itemCount: filesInFolder.length + subfoldersInFolder.length,
         };
@@ -455,9 +446,8 @@ export const getFolderContents = query({
     // Check access
     const canAccess =
       folder.createdBy === user._id ||
-      folder.assignedTo?.includes(user._id) ||
+      folder.assignedTo === user._id ||
       !folder.assignedTo ||
-      folder.assignedTo.length === 0 ||
       folder.sharedWithFamily ||
       folder.sharedWith?.includes(user._id);
 
@@ -490,12 +480,10 @@ export const getFolderContents = query({
 
     const subfoldersWithInfo = await Promise.all(
       subfolders.map(async (subfolder) => {
-        let assigneeNames: string[] = [];
-        if (subfolder.assignedTo && subfolder.assignedTo.length > 0) {
-          const assignees = await Promise.all(
-            subfolder.assignedTo.map((id) => ctx.db.get(id))
-          );
-          assigneeNames = assignees.filter(Boolean).map((a) => a!.name);
+        let assigneeName: string | undefined;
+        if (subfolder.assignedTo) {
+          const assignee = await ctx.db.get(subfolder.assignedTo);
+          assigneeName = assignee?.name;
         }
 
         // Count items
@@ -511,22 +499,20 @@ export const getFolderContents = query({
 
         return {
           ...subfolder,
-          assigneeNames,
+          assigneeName,
           itemCount: filesInFolder.length + subfoldersInFolder.length,
         };
       })
     );
 
-    let assigneeNames: string[] = [];
-    if (folder.assignedTo && folder.assignedTo.length > 0) {
-      const assignees = await Promise.all(
-        folder.assignedTo.map((id) => ctx.db.get(id))
-      );
-      assigneeNames = assignees.filter(Boolean).map((a) => a!.name);
+    let assigneeName: string | undefined;
+    if (folder.assignedTo) {
+      const assignee = await ctx.db.get(folder.assignedTo);
+      assigneeName = assignee?.name;
     }
 
     return {
-      folder: { ...folder, assigneeNames },
+      folder: { ...folder, assigneeName },
       files: filesWithInfo.sort((a, b) => b.createdAt - a.createdAt),
       subfolders: subfoldersWithInfo.sort((a, b) => a.name.localeCompare(b.name)),
     };

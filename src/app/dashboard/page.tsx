@@ -201,11 +201,11 @@ export default function DashboardPage() {
     return groups;
   }, [filteredSharedFiles]);
 
-  // Get current folder's assignee for default file assignment (use first assignee if multiple)
+  // Get current folder's assignee for default file assignment
   const currentFolderAssignee = useMemo(() => {
     if (!currentFolderId || !allFolders) return undefined;
     const currentFolder = allFolders.find((f) => f._id === currentFolderId);
-    return currentFolder?.assignedTo?.[0];
+    return currentFolder?.assignedTo;
   }, [currentFolderId, allFolders]);
 
   // Navigate to folder
@@ -273,7 +273,7 @@ export default function DashboardPage() {
       sharedWithFamily={folder.sharedWithFamily}
       sharedWith={folder.sharedWith ?? []}
       assignedTo={folder.assignedTo}
-      assigneeNames={folder.assigneeNames}
+      assigneeName={folder.assigneeName}
       itemCount={folder.itemCount}
       isOwner={isOwner}
       familyMembers={members}
@@ -424,7 +424,7 @@ export default function DashboardPage() {
                   const ownerMember = members.find((m) => m.role === "owner");
                   if (!ownerMember) return null;
                   const ownerFolders = filteredMyFolders.filter(
-                    (f) => f.assignedTo?.includes(ownerMember._id)
+                    (f) => f.assignedTo === ownerMember._id
                   );
                   const ownerFiles = groupedFiles[ownerMember?._id ?? ""] ?? [];
                   if (ownerFolders.length === 0 && ownerFiles.length === 0) return null;
@@ -449,7 +449,7 @@ export default function DashboardPage() {
                   .filter((m) => m.role !== "owner")
                   .map((member) => {
                     const memberFolders = filteredMyFolders.filter(
-                      (f) => f.assignedTo?.includes(member._id)
+                      (f) => f.assignedTo === member._id
                     );
                     const memberFiles = groupedFiles[member._id] ?? [];
                     if (memberFolders.length === 0 && memberFiles.length === 0) return null;
@@ -471,7 +471,7 @@ export default function DashboardPage() {
 
                 {/* Family items (unassigned folders and files) */}
                 {(() => {
-                  const unassignedFolders = filteredMyFolders.filter((f) => !f.assignedTo || f.assignedTo.length === 0);
+                  const unassignedFolders = filteredMyFolders.filter((f) => !f.assignedTo);
                   const unassignedFiles = groupedFiles.unassigned ?? [];
                   if (unassignedFolders.length === 0 && unassignedFiles.length === 0) return null;
                   return (
@@ -569,7 +569,7 @@ export default function DashboardPage() {
                           sharedWithFamily={folder.sharedWithFamily}
                           sharedWith={folder.sharedWith ?? []}
                           assignedTo={folder.assignedTo}
-                          assigneeNames={folder.assigneeNames}
+                          assigneeName={folder.assigneeName}
                           itemCount={folder.itemCount}
                           isOwner={false}
                           familyMembers={members}

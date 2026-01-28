@@ -232,8 +232,8 @@ export const getSharedFiles = query({
       allFolders
         .filter((folder) => {
           if (folder.createdBy === user._id) return false;
-          if (folder.assignedTo?.includes(user._id)) return false;
-          if (!folder.assignedTo || folder.assignedTo.length === 0) return false;
+          if (folder.assignedTo === user._id) return false;
+          if (!folder.assignedTo) return false;
           return folder.sharedWithFamily || folder.sharedWith?.includes(user._id);
         })
         .map((f) => f._id)

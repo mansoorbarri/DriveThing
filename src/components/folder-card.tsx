@@ -32,8 +32,8 @@ interface FolderCardProps {
   name: string;
   sharedWithFamily: boolean;
   sharedWith?: Id<"users">[];
-  assignedTo?: Id<"users">[];
-  assigneeNames?: string[];
+  assignedTo?: Id<"users">;
+  assigneeName?: string;
   itemCount: number;
   isOwner: boolean;
   familyMembers?: FamilyMember[];
@@ -46,8 +46,8 @@ export function FolderCard({
   name,
   sharedWithFamily,
   sharedWith = [],
-  assignedTo = [],
-  assigneeNames = [],
+  assignedTo,
+  assigneeName,
   itemCount,
   isOwner,
   familyMembers = [],
@@ -66,7 +66,6 @@ export function FolderCard({
   const [isSharingUpdating, setIsSharingUpdating] = useState(false);
   const [newName, setNewName] = useState(name);
   const [deleteContents, setDeleteContents] = useState(false);
-  const [selectedAssignees, setSelectedAssignees] = useState<Id<"users">[]>(assignedTo);
 
   const deleteFolder = useMutation(api.folders.deleteFolder);
   const renameFolder = useMutation(api.folders.renameFolder);
@@ -79,7 +78,7 @@ export function FolderCard({
   // Check if current user can share this folder (owner OR folder is assigned to them)
   const currentUserEmail = user?.primaryEmailAddress?.emailAddress;
   const currentMember = familyMembers.find((m) => m.email === currentUserEmail);
-  const isAssignedToMe = currentMember && assignedTo.includes(currentMember._id);
+  const isAssignedToMe = currentMember && assignedTo === currentMember._id;
   const canShare = isOwner || isAssignedToMe;
 
   // Check if shared with specific members (not whole family)
@@ -126,21 +125,13 @@ export function FolderCard({
     }
   };
 
-  const toggleAssignee = (memberId: Id<"users">) => {
-    setSelectedAssignees((prev) =>
-      prev.includes(memberId)
-        ? prev.filter((id) => id !== memberId)
-        : [...prev, memberId]
-    );
-  };
-
-  const handleSaveAssignment = async () => {
+  const handleReassign = async (newAssignee?: Id<"users">) => {
     if (!user) return;
     setIsReassigning(true);
     try {
       await updateAssignment({
         folderId: id,
-        assignedTo: selectedAssignees.length > 0 ? selectedAssignees : undefined,
+        assignedTo: newAssignee,
         clerkId: user.id,
       });
       setShowReassignModal(false);
@@ -171,18 +162,6 @@ export function FolderCard({
     onClick();
   };
 
-  const openReassignModal = () => {
-    setSelectedAssignees(assignedTo);
-    setShowReassignModal(true);
-  };
-
-  // Format assignee names for display
-  const assigneeDisplay = assigneeNames.length > 0
-    ? assigneeNames.length === 1
-      ? assigneeNames[0]
-      : `${assigneeNames.length} people`
-    : null;
-
   return (
     <>
       <div
@@ -207,9 +186,9 @@ export function FolderCard({
           </div>
 
           {/* Assignee */}
-          {assigneeDisplay && (
-            <p className="mt-2 text-xs text-zinc-500" title={assigneeNames.join(", ")}>
-              Assigned to {assigneeDisplay}
+          {assigneeName && (
+            <p className="mt-2 text-xs text-zinc-500">
+              Assigned to {assigneeName}
             </p>
           )}
 
@@ -314,12 +293,12 @@ export function FolderCard({
                     <button
                       onClick={() => {
                         setShowMenu(false);
-                        openReassignModal();
+                        setShowReassignModal(true);
                       }}
                       className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
                     >
                       <UserIcon className="h-4 w-4" />
-                      {assignedTo.length > 0 ? "Reassign" : "Assign to"}
+                      {assignedTo ? "Reassign" : "Assign to"}
                     </button>
                   )}
                   <hr className="my-1 border-zinc-700" />
@@ -432,87 +411,56 @@ export function FolderCard({
           onClose={() => setShowReassignModal(false)}
           title="Assign folder"
         >
-          <p className="mb-2 text-sm text-zinc-400">
-            Select who this folder should be assigned to.
+          <p className="mb-4 text-sm text-zinc-400">
+            Choose who this folder should be assigned to.
           </p>
-          <p className="mb-4 text-xs text-zinc-500">
-            Select one or more people, or leave empty for a family folder.
-          </p>
-          <div className="max-h-[300px] space-y-2 overflow-y-auto">
-            {assignableMembers.map((member) => {
-              const isSelected = selectedAssignees.includes(member._id);
-              return (
-                <button
-                  key={member._id}
-                  type="button"
-                  onClick={() => toggleAssignee(member._id)}
-                  disabled={isReassigning}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
-                    isSelected
-                      ? "border-violet-500 bg-violet-500/10"
-                      : "border-zinc-700 hover:bg-zinc-800"
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "flex h-5 w-5 items-center justify-center rounded border",
-                      isSelected
-                        ? "border-violet-500 bg-violet-500"
-                        : "border-zinc-600 bg-zinc-800"
-                    )}
-                  >
-                    {isSelected && (
-                      <svg
-                        className="h-3 w-3 text-white"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={3}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    )}
-                  </div>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-700 text-zinc-300">
-                    {member.name[0]?.toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-medium text-zinc-200">
-                      {member.name}
-                      {member.role === "owner" ? " (Me)" : ""}
-                    </p>
-                    <p className="text-xs text-zinc-500">{member.email}</p>
-                  </div>
-                </button>
-              );
-            })}
+          <div className="space-y-2">
+            <button
+              onClick={() => handleReassign(undefined)}
+              disabled={isReassigning}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
+                !assignedTo
+                  ? "border-violet-500 bg-violet-500/10 text-zinc-100"
+                  : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              )}
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-700 text-zinc-400">
+                <FolderIcon className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="font-medium">Unassigned</p>
+                <p className="text-xs text-zinc-500">Family folder</p>
+              </div>
+            </button>
+            {assignableMembers.map((member) => (
+              <button
+                key={member._id}
+                onClick={() => handleReassign(member._id)}
+                disabled={isReassigning}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
+                  assignedTo === member._id
+                    ? "border-violet-500 bg-violet-500/10 text-zinc-100"
+                    : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                )}
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-700 text-zinc-300">
+                  {member.name[0]?.toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-medium">
+                    {member.name}
+                    {member.role === "owner" ? " (Me)" : ""}
+                  </p>
+                  <p className="text-xs text-zinc-500">{member.email}</p>
+                </div>
+              </button>
+            ))}
           </div>
-          {selectedAssignees.length === 0 && (
-            <p className="mt-2 text-xs text-zinc-500">
-              This will be a family folder visible to everyone.
-            </p>
+          {isReassigning && (
+            <p className="mt-4 text-center text-sm text-zinc-500">Saving...</p>
           )}
-          <div className="mt-4 flex gap-3">
-            <Button
-              variant="secondary"
-              onClick={() => setShowReassignModal(false)}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSaveAssignment}
-              loading={isReassigning}
-              className="flex-1"
-            >
-              Save
-            </Button>
-          </div>
         </Modal>
       )}
 
