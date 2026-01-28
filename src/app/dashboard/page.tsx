@@ -201,6 +201,13 @@ export default function DashboardPage() {
     return groups;
   }, [filteredSharedFiles]);
 
+  // Get current folder's assignee for default file assignment
+  const currentFolderAssignee = useMemo(() => {
+    if (!currentFolderId || !allFolders) return undefined;
+    const currentFolder = allFolders.find((f) => f._id === currentFolderId);
+    return currentFolder?.assignedTo;
+  }, [currentFolderId, allFolders]);
+
   // Navigate to folder
   const navigateToFolder = (folderId?: Id<"folders">) => {
     setCurrentFolderId(folderId);
@@ -412,45 +419,72 @@ export default function DashboardPage() {
             ) : isOwner && groupedFiles ? (
               // Grouped view for owners
               <div className="space-y-8">
-                {/* Folders first - always show as flat list */}
-                {filteredMyFolders.length > 0 && (
-                  <div>
-                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
-                      Folders ({filteredMyFolders.length})
-                    </h3>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {filteredMyFolders.map(renderFolderCard)}
-                    </div>
-                  </div>
-                )}
-
-                {/* Unassigned files */}
-                {(groupedFiles.unassigned?.length ?? 0) > 0 && (
-                  <div>
-                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
-                      Family Documents ({groupedFiles.unassigned?.length ?? 0})
-                    </h3>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {groupedFiles.unassigned?.map((file) => renderFileCard(file))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Files grouped by member (including owner) */}
-                {members.map((member) => {
-                  const memberFiles = groupedFiles[member._id] ?? [];
-                  if (memberFiles.length === 0) return null;
+                {/* Owner's folders and files first */}
+                {(() => {
+                  const ownerMember = members.find((m) => m.role === "owner");
+                  const ownerFolders = filteredMyFolders.filter(
+                    (f) => f.assignedTo === ownerMember?._id
+                  );
+                  const ownerFiles = groupedFiles[ownerMember?._id ?? ""] ?? [];
+                  if (ownerFolders.length === 0 && ownerFiles.length === 0) return null;
                   return (
-                    <div key={member._id}>
-                      <h3 className="mb-4 text-sm font-medium text-zinc-400">
-                        {member.name}&apos;s Files ({memberFiles.length})
+                    <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-4">
+                      <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-violet-400">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-500/20 text-xs">
+                          {ownerMember?.name[0]?.toUpperCase()}
+                        </span>
+                        {ownerMember?.name}&apos;s Items ({ownerFolders.length + ownerFiles.length})
                       </h3>
                       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {memberFiles.map((file) => renderFileCard(file))}
+                        {ownerFolders.map(renderFolderCard)}
+                        {ownerFiles.map((file) => renderFileCard(file))}
                       </div>
                     </div>
                   );
-                })}
+                })()}
+
+                {/* Other members' folders and files */}
+                {members
+                  .filter((m) => m.role !== "owner")
+                  .map((member) => {
+                    const memberFolders = filteredMyFolders.filter(
+                      (f) => f.assignedTo === member._id
+                    );
+                    const memberFiles = groupedFiles[member._id] ?? [];
+                    if (memberFolders.length === 0 && memberFiles.length === 0) return null;
+                    return (
+                      <div key={member._id}>
+                        <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-zinc-400">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-700 text-xs text-zinc-300">
+                            {member.name[0]?.toUpperCase()}
+                          </span>
+                          {member.name}&apos;s Items ({memberFolders.length + memberFiles.length})
+                        </h3>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {memberFolders.map(renderFolderCard)}
+                          {memberFiles.map((file) => renderFileCard(file))}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                {/* Family items (unassigned folders and files) */}
+                {(() => {
+                  const unassignedFolders = filteredMyFolders.filter((f) => !f.assignedTo);
+                  const unassignedFiles = groupedFiles.unassigned ?? [];
+                  if (unassignedFolders.length === 0 && unassignedFiles.length === 0) return null;
+                  return (
+                    <div>
+                      <h3 className="mb-4 text-sm font-medium text-zinc-400">
+                        Family Items ({unassignedFolders.length + unassignedFiles.length})
+                      </h3>
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {unassignedFolders.map(renderFolderCard)}
+                        {unassignedFiles.map((file) => renderFileCard(file))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
               // Grouped view for members - Folders + My Files + Family Documents
@@ -611,6 +645,7 @@ export default function DashboardPage() {
           onClose={() => setShowUploader(false)}
           familyMembers={members}
           currentFolderId={currentFolderId}
+          currentFolderAssignee={currentFolderAssignee}
           folders={allFolders ?? []}
         />
       </Modal>

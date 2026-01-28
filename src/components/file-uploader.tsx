@@ -25,12 +25,14 @@ interface FolderOption {
   _id: Id<"folders">;
   name: string;
   parentFolderId?: Id<"folders">;
+  assignedTo?: Id<"users">;
 }
 
 interface FileUploaderProps {
   onClose?: () => void;
   familyMembers: FamilyMember[];
   currentFolderId?: Id<"folders">;
+  currentFolderAssignee?: Id<"users">;
   folders?: FolderOption[];
 }
 
@@ -98,6 +100,7 @@ export function FileUploader({
   onClose,
   familyMembers,
   currentFolderId,
+  currentFolderAssignee,
   folders = [],
 }: FileUploaderProps) {
   const { user } = useUser();
@@ -182,18 +185,19 @@ export function FileUploader({
       if (acceptedFiles.length === 0) return;
 
       // Add files to pending with default names
+      // Default assignee to the folder's assignee if uploading into an assigned folder
       const newPendingFiles = acceptedFiles.map((file) => ({
         file,
         customName: file.name.replace(/\.[^/.]+$/, ""), // Remove extension for display
         originalName: file.name,
-        assignedTo: undefined,
+        assignedTo: currentFolderAssignee,
         folderId: currentFolderId,
         tags: [],
       }));
 
       setPendingFiles((prev) => [...prev, ...newPendingFiles]);
     },
-    [currentFolderId]
+    [currentFolderId, currentFolderAssignee]
   );
 
   const updateFileName = (index: number, newName: string) => {
@@ -318,6 +322,10 @@ export function FileUploader({
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
         ".xlsx",
       ],
+      "application/msword": [".doc"],
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+        ".docx",
+      ],
     },
     maxSize: 64 * 1024 * 1024, // 64MB (will be compressed if image)
     disabled: isUploading || isProcessing,
@@ -353,7 +361,7 @@ export function FileUploader({
           </p>
           <p className="mt-1 text-sm text-zinc-500">or tap to select files</p>
           <p className="mt-3 text-xs text-zinc-600">
-            PDF, images, and Excel files. Images over 1MB will be compressed.
+            PDF, images, Word, and Excel files. Images over 1MB will be compressed.
           </p>
         </div>
       )}

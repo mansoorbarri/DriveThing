@@ -584,6 +584,7 @@ export const getAllFoldersForPicker = query({
       _id: folder._id,
       name: folder.name,
       parentFolderId: folder.parentFolderId,
+      assignedTo: folder.assignedTo,
     }));
   },
 });
