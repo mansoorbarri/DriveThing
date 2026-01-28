@@ -14,6 +14,7 @@ import {
   UserIcon,
   EditIcon,
   MoveIcon,
+  CheckIcon,
 } from "./icons";
 import { Button } from "./ui/button";
 import { Modal } from "./ui/modal";
@@ -66,6 +67,8 @@ export function FolderCard({
   const [isSharingUpdating, setIsSharingUpdating] = useState(false);
   const [newName, setNewName] = useState(name);
   const [deleteContents, setDeleteContents] = useState(false);
+  const [shareWithAll, setShareWithAll] = useState(sharedWithFamily);
+  const [selectedShareMembers, setSelectedShareMembers] = useState<Id<"users">[]>(sharedWith);
 
   const deleteFolder = useMutation(api.folders.deleteFolder);
   const renameFolder = useMutation(api.folders.renameFolder);
@@ -468,49 +471,144 @@ export function FolderCard({
       {canShare && (
         <Modal
           isOpen={showShareModal}
-          onClose={() => setShowShareModal(false)}
+          onClose={() => {
+            setShowShareModal(false);
+            setShareWithAll(sharedWithFamily);
+            setSelectedShareMembers(sharedWith);
+          }}
           title="Share folder"
         >
-          <p className="mb-4 text-sm text-zinc-400">
-            Choose who can see this folder and its contents.
-          </p>
-          <div className="space-y-2">
+          <div className="space-y-4">
+            <p className="text-sm text-zinc-400">
+              Choose who can see &ldquo;{name}&rdquo; and its contents.
+            </p>
+
+            {/* Share with everyone option */}
             <button
-              onClick={() => handleShareUpdate(true, [])}
-              disabled={isSharingUpdating}
+              onClick={() => {
+                if (shareWithAll) {
+                  setShareWithAll(false);
+                } else {
+                  setShareWithAll(true);
+                  setSelectedShareMembers([]);
+                }
+              }}
               className={cn(
-                "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
-                sharedWithFamily
-                  ? "border-violet-500 bg-violet-500/10 text-zinc-100"
-                  : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                "flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-colors",
+                shareWithAll
+                  ? "border-violet-500 bg-violet-500/10"
+                  : "border-zinc-700 hover:bg-zinc-800"
               )}
             >
-              <ShareIcon className="h-5 w-5 text-violet-400" />
-              <div>
-                <p className="font-medium">Share with family</p>
-                <p className="text-xs text-zinc-500">Everyone can see this folder</p>
+              <div
+                className={cn(
+                  "flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium",
+                  shareWithAll
+                    ? "bg-violet-600 text-white"
+                    : "bg-zinc-800 text-zinc-400"
+                )}
+              >
+                All
               </div>
-            </button>
-            <button
-              onClick={() => handleShareUpdate(false, [])}
-              disabled={isSharingUpdating}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
-                !sharedWithFamily && sharedWith.length === 0
-                  ? "border-violet-500 bg-violet-500/10 text-zinc-100"
-                  : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-              )}
-            >
-              <FolderIcon className="h-5 w-5 text-zinc-400" />
-              <div>
-                <p className="font-medium">Private</p>
-                <p className="text-xs text-zinc-500">Only you can see this folder</p>
+              <div className="flex-1">
+                <p className="font-medium text-zinc-100">Everyone in family</p>
+                <p className="text-sm text-zinc-500">
+                  All {familyMembers.length} members can see this folder
+                </p>
               </div>
+              {shareWithAll && <CheckIcon className="h-5 w-5 text-violet-400" />}
             </button>
+
+            {/* Individual members */}
+            {!shareWithAll && (() => {
+              const otherMembers = familyMembers.filter(
+                (m) => m.email !== currentUserEmail
+              );
+              if (otherMembers.length === 0) return null;
+              return (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                    Or share with specific people
+                  </p>
+                  {otherMembers.map((member) => {
+                    const isSelected = selectedShareMembers.includes(member._id);
+                    return (
+                      <button
+                        key={member._id}
+                        onClick={() => {
+                          setSelectedShareMembers((prev) =>
+                            prev.includes(member._id)
+                              ? prev.filter((id) => id !== member._id)
+                              : [...prev, member._id]
+                          );
+                        }}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
+                          isSelected
+                            ? "border-violet-500 bg-violet-500/10"
+                            : "border-zinc-700 hover:bg-zinc-800"
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "flex h-9 w-9 items-center justify-center rounded-full text-sm font-medium",
+                            isSelected
+                              ? "bg-violet-600 text-white"
+                              : "bg-zinc-800 text-zinc-400"
+                          )}
+                        >
+                          {member.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium text-zinc-100">
+                            {member.name}
+                          </p>
+                          <p className="truncate text-sm text-zinc-500">
+                            {member.email}
+                          </p>
+                        </div>
+                        {isSelected && <CheckIcon className="h-5 w-5 text-violet-400" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* Not shared indicator */}
+            {!shareWithAll && selectedShareMembers.length === 0 && (
+              <p className="rounded-lg bg-zinc-800/50 p-3 text-center text-sm text-zinc-500">
+                This folder is private - only you can see it
+              </p>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowShareModal(false);
+                  setShareWithAll(sharedWithFamily);
+                  setSelectedShareMembers(sharedWith);
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => handleShareUpdate(shareWithAll, shareWithAll ? [] : selectedShareMembers)}
+                disabled={
+                  shareWithAll === sharedWithFamily &&
+                  JSON.stringify([...selectedShareMembers].sort()) ===
+                    JSON.stringify([...sharedWith].sort())
+                }
+                loading={isSharingUpdating}
+                className="flex-1"
+              >
+                {shareWithAll || selectedShareMembers.length > 0 ? "Save" : "Keep private"}
+              </Button>
+            </div>
           </div>
-          {isSharingUpdating && (
-            <p className="mt-4 text-center text-sm text-zinc-500">Saving...</p>
-          )}
         </Modal>
       )}
     </>
