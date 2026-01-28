@@ -53,6 +53,7 @@ interface FileCardProps {
   uploaderName?: string;
   familyMembers?: FamilyMember[];
   folderId?: Id<"folders">;
+  folderName?: string; // For showing location in search results
   onMoveClick?: () => void;
 }
 
@@ -71,6 +72,7 @@ export function FileCard({
   isOwner,
   uploaderName,
   familyMembers = [],
+  folderName,
   onMoveClick,
 }: FileCardProps) {
   const { user } = useUser();
@@ -226,6 +228,13 @@ export function FileCard({
             <span className="text-zinc-700">|</span>
             <span>{formatDate(createdAt)}</span>
           </div>
+
+          {/* Folder location (shown in search results) */}
+          {folderName && (
+            <p className="mt-1 truncate text-xs text-zinc-500">
+              in {folderName}
+            </p>
+          )}
 
           {/* Assignee */}
           {assigneeName && (

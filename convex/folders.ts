@@ -280,6 +280,7 @@ export const getMyFolders = query({
   args: {
     clerkId: v.string(),
     parentFolderId: v.optional(v.id("folders")),
+    all: v.optional(v.boolean()), // When true, get all folders (for search)
   },
   handler: async (ctx, args) => {
     const user = await ctx.db
@@ -293,11 +294,21 @@ export const getMyFolders = query({
 
     const familyId = user.familyId;
 
-    // Get all folders in the family at this level
-    const allFolders = await ctx.db
-      .query("folders")
-      .withIndex("by_parent", (q) => q.eq("parentFolderId", args.parentFolderId))
-      .collect();
+    // Get folders - either all or filtered by parent
+    let allFolders;
+    if (args.all) {
+      // Get all folders in the family (for search)
+      allFolders = await ctx.db
+        .query("folders")
+        .withIndex("by_family", (q) => q.eq("familyId", familyId))
+        .collect();
+    } else {
+      // Get folders at specific level
+      allFolders = await ctx.db
+        .query("folders")
+        .withIndex("by_parent", (q) => q.eq("parentFolderId", args.parentFolderId))
+        .collect();
+    }
 
     // Filter to folders in this family
     const familyFolders = allFolders.filter((f) => f.familyId === familyId);
@@ -352,6 +363,7 @@ export const getSharedFolders = query({
   args: {
     clerkId: v.string(),
     parentFolderId: v.optional(v.id("folders")),
+    all: v.optional(v.boolean()), // When true, get all folders (for search)
   },
   handler: async (ctx, args) => {
     const user = await ctx.db
@@ -365,11 +377,21 @@ export const getSharedFolders = query({
 
     const familyId = user.familyId;
 
-    // Get all folders at this level
-    const allFolders = await ctx.db
-      .query("folders")
-      .withIndex("by_parent", (q) => q.eq("parentFolderId", args.parentFolderId))
-      .collect();
+    // Get folders - either all or filtered by parent
+    let allFolders;
+    if (args.all) {
+      // Get all folders in the family (for search)
+      allFolders = await ctx.db
+        .query("folders")
+        .withIndex("by_family", (q) => q.eq("familyId", familyId))
+        .collect();
+    } else {
+      // Get folders at specific level
+      allFolders = await ctx.db
+        .query("folders")
+        .withIndex("by_parent", (q) => q.eq("parentFolderId", args.parentFolderId))
+        .collect();
+    }
 
     // Filter to folders in this family that are shared with user
     const sharedFolders = allFolders.filter((folder) => {

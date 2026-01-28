@@ -63,16 +63,31 @@ export default function DashboardPage() {
     user ? { clerkId: user.id } : "skip"
   );
 
-  // Fetch folders
-  const myFolders = useQuery(
+  // Fetch folders (for normal browsing)
+  const myFoldersInParent = useQuery(
     api.folders.getMyFolders,
     user ? { clerkId: user.id, parentFolderId: currentFolderId } : "skip"
   );
 
-  const sharedFolders = useQuery(
+  const sharedFoldersInParent = useQuery(
     api.folders.getSharedFolders,
     user ? { clerkId: user.id, parentFolderId: currentFolderId } : "skip"
   );
+
+  // Fetch ALL folders for global search
+  const allMyFolders = useQuery(
+    api.folders.getMyFolders,
+    user && searchQuery ? { clerkId: user.id, all: true } : "skip"
+  );
+
+  const allSharedFolders = useQuery(
+    api.folders.getSharedFolders,
+    user && searchQuery ? { clerkId: user.id, all: true } : "skip"
+  );
+
+  // Use global folders when searching, parent-filtered folders otherwise
+  const myFolders = searchQuery ? allMyFolders : myFoldersInParent;
+  const sharedFolders = searchQuery ? allSharedFolders : sharedFoldersInParent;
 
   // Fetch folder path for breadcrumbs
   const folderPath = useQuery(
@@ -86,8 +101,8 @@ export default function DashboardPage() {
     user ? { clerkId: user.id } : "skip"
   );
 
-  // Fetch files with folder filter
-  const myFiles = useQuery(
+  // Fetch files with folder filter (for normal browsing)
+  const myFilesInFolder = useQuery(
     api.files.getMyFiles,
     user
       ? {
@@ -98,7 +113,7 @@ export default function DashboardPage() {
       : "skip"
   );
 
-  const sharedFiles = useQuery(
+  const sharedFilesInFolder = useQuery(
     api.files.getSharedFiles,
     user
       ? {
@@ -108,6 +123,21 @@ export default function DashboardPage() {
         }
       : "skip"
   );
+
+  // Fetch ALL files for global search
+  const allMyFiles = useQuery(
+    api.files.getMyFiles,
+    user && searchQuery ? { clerkId: user.id } : "skip"
+  );
+
+  const allSharedFiles = useQuery(
+    api.files.getSharedFiles,
+    user && searchQuery ? { clerkId: user.id } : "skip"
+  );
+
+  // Use global files when searching, folder files otherwise
+  const myFiles = searchQuery ? allMyFiles : myFilesInFolder;
+  const sharedFiles = searchQuery ? allSharedFiles : sharedFilesInFolder;
 
   // Build folder name lookup map
   const folderNameMap = useMemo(() => {
@@ -282,6 +312,7 @@ export default function DashboardPage() {
       isOwner={isOwner}
       familyMembers={members}
       folderId={file.folderId}
+      folderName={searchQuery && file.folderId ? folderNameMap.get(file.folderId) : undefined}
       onMoveClick={
         isOwner
           ? () =>
@@ -309,6 +340,7 @@ export default function DashboardPage() {
       itemCount={folder.itemCount}
       isOwner={isOwner}
       familyMembers={members}
+      parentFolderName={searchQuery && folder.parentFolderId ? folderNameMap.get(folder.parentFolderId) : undefined}
       onClick={() => navigateToFolder(folder._id)}
       onMoveClick={
         isOwner
@@ -605,6 +637,7 @@ export default function DashboardPage() {
                           itemCount={folder.itemCount}
                           isOwner={false}
                           familyMembers={members}
+                          parentFolderName={searchQuery && folder.parentFolderId ? folderNameMap.get(folder.parentFolderId) : undefined}
                           onClick={() => navigateToFolder(folder._id)}
                         />
                       ))}
@@ -641,6 +674,7 @@ export default function DashboardPage() {
                               isOwner={false}
                               uploaderName={file.uploaderName}
                               familyMembers={members}
+                              folderName={searchQuery && file.folderId ? folderNameMap.get(file.folderId) : undefined}
                             />
                           ))}
                         </div>

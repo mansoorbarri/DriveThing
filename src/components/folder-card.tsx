@@ -38,6 +38,7 @@ interface FolderCardProps {
   itemCount: number;
   isOwner: boolean;
   familyMembers?: FamilyMember[];
+  parentFolderName?: string; // For showing location in search results
   onClick: () => void;
   onMoveClick?: () => void;
 }
@@ -52,6 +53,7 @@ export function FolderCard({
   itemCount,
   isOwner,
   familyMembers = [],
+  parentFolderName,
   onClick,
   onMoveClick,
 }: FolderCardProps) {
@@ -187,6 +189,13 @@ export function FolderCard({
               {itemCount} {itemCount === 1 ? "item" : "items"}
             </span>
           </div>
+
+          {/* Parent folder location (shown in search results) */}
+          {parentFolderName && (
+            <p className="mt-1 truncate text-xs text-zinc-500">
+              in {parentFolderName}
+            </p>
+          )}
 
           {/* Assignee */}
           {assigneeName && (
