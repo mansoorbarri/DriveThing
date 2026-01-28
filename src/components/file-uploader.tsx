@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useRef } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import imageCompression from "browser-image-compression";
 import { useUploadThing } from "~/lib/uploadthing-hooks";
@@ -13,6 +13,7 @@ import { formatFileSize } from "~/lib/utils";
 import { UploadIcon, CheckIcon, CloseIcon } from "./icons";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { useToast } from "./ui/toast";
 
 interface FamilyMember {
   _id: Id<"users">;
@@ -104,6 +105,7 @@ export function FileUploader({
   folders = [],
 }: FileUploaderProps) {
   const { user } = useUser();
+  const { toast } = useToast();
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -115,6 +117,18 @@ export function FileUploader({
 
   // All family members (including owner) can be assigned files
   const assignableMembers = familyMembers;
+
+  // Auto-close and show toast when all uploads complete
+  const allDone = uploadingFiles.length > 0 && uploadingFiles.every((f) => f.status === "done");
+  const hasErrors = uploadingFiles.some((f) => f.status === "error");
+
+  useEffect(() => {
+    if (allDone && !hasErrors) {
+      const count = uploadingFiles.length;
+      toast(`${count} file${count > 1 ? "s" : ""} uploaded successfully`);
+      onClose?.();
+    }
+  }, [allDone, hasErrors, uploadingFiles.length, toast, onClose]);
 
   const { startUpload, isUploading } = useUploadThing("fileUploader", {
     onUploadProgress: (progress) => {
@@ -353,8 +367,6 @@ export function FileUploader({
     disabled: isUploading || isProcessing,
   });
 
-  const allDone =
-    uploadingFiles.length > 0 && uploadingFiles.every((f) => f.status === "done");
   const hasUploading = uploadingFiles.some(
     (f) =>
       f.status === "uploading" ||
@@ -606,13 +618,6 @@ export function FileUploader({
             </div>
           ))}
         </div>
-      )}
-
-      {/* Done button */}
-      {allDone && onClose && (
-        <Button onClick={onClose} className="w-full">
-          Done
-        </Button>
       )}
 
       {/* Uploading indicator */}
