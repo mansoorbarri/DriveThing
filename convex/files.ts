@@ -477,7 +477,7 @@ export const searchFiles = query({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
       .unique();
 
-    if (!user) {
+    if (!user || !user.familyId) {
       return [];
     }
 
@@ -485,27 +485,63 @@ export const searchFiles = query({
 
     // Get user's files based on role
     let myFiles;
-    if (user.role === "owner" && user.familyId) {
+    if (user.role === "owner") {
       // Owner sees all family files
       myFiles = await ctx.db
         .query("files")
         .withIndex("by_family", (q) => q.eq("familyId", user.familyId!))
         .collect();
     } else {
-      // Member sees assigned files
-      myFiles = await ctx.db
+      // Member sees assigned files + unassigned family files
+      const allFamilyFiles = await ctx.db
         .query("files")
-        .withIndex("by_assigned", (q) => q.eq("assignedTo", user._id))
+        .withIndex("by_family", (q) => q.eq("familyId", user.familyId!))
         .collect();
+      myFiles = allFamilyFiles.filter(
+        (f) => f.assignedTo === user._id || !f.assignedTo
+      );
     }
 
-    // Filter by search term (name or tags)
-    return myFiles.filter((file) => {
+    // Get all folders for folder name lookup
+    const folders = await ctx.db
+      .query("folders")
+      .withIndex("by_family", (q) => q.eq("familyId", user.familyId!))
+      .collect();
+    const folderMap = new Map(folders.map((f) => [f._id, f.name]));
+
+    // Get all family members for assignee name lookup
+    const members = await ctx.db
+      .query("users")
+      .withIndex("by_family", (q) => q.eq("familyId", user.familyId!))
+      .collect();
+    const memberMap = new Map(members.map((m) => [m._id, m.name]));
+
+    // Filter by search term (name, tags, folder name, or assignee name)
+    const matchingFiles = myFiles.filter((file) => {
+      // Match file name
       if (file.name.toLowerCase().includes(term)) return true;
+      // Match tags
       if (file.tags?.some((tag) => tag.toLowerCase().includes(term)))
         return true;
+      // Match folder name
+      if (file.folderId) {
+        const folderName = folderMap.get(file.folderId);
+        if (folderName?.toLowerCase().includes(term)) return true;
+      }
+      // Match assignee name
+      if (file.assignedTo) {
+        const assigneeName = memberMap.get(file.assignedTo);
+        if (assigneeName?.toLowerCase().includes(term)) return true;
+      }
       return false;
     });
+
+    // Enrich with folder and assignee names
+    return matchingFiles.map((file) => ({
+      ...file,
+      folderName: file.folderId ? folderMap.get(file.folderId) : undefined,
+      assigneeName: file.assignedTo ? memberMap.get(file.assignedTo) : undefined,
+    }));
   },
 });
 

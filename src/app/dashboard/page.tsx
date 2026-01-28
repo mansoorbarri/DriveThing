@@ -109,42 +109,74 @@ export default function DashboardPage() {
       : "skip"
   );
 
-  // Filter files and folders by search
+  // Build folder name lookup map
+  const folderNameMap = useMemo(() => {
+    if (!allFolders) return new Map<string, string>();
+    return new Map(allFolders.map((f) => [f._id, f.name]));
+  }, [allFolders]);
+
+  // Filter files and folders by search (name, tags, folder name, assignee name)
   const filteredMyFolders = useMemo(() => {
     if (!myFolders) return [];
     if (!searchQuery) return myFolders;
     const term = searchQuery.toLowerCase();
-    return myFolders.filter((f) => f.name.toLowerCase().includes(term));
+    return myFolders.filter(
+      (f) =>
+        f.name.toLowerCase().includes(term) ||
+        f.assigneeName?.toLowerCase().includes(term)
+    );
   }, [myFolders, searchQuery]);
 
   const filteredMyFiles = useMemo(() => {
     if (!myFiles) return [];
     if (!searchQuery) return myFiles;
     const term = searchQuery.toLowerCase();
-    return myFiles.filter(
-      (f) =>
-        f.name.toLowerCase().includes(term) ||
-        f.tags?.some((tag) => tag.toLowerCase().includes(term))
-    );
-  }, [myFiles, searchQuery]);
+    return myFiles.filter((f) => {
+      // Match file name
+      if (f.name.toLowerCase().includes(term)) return true;
+      // Match tags
+      if (f.tags?.some((tag) => tag.toLowerCase().includes(term))) return true;
+      // Match folder name
+      if (f.folderId) {
+        const folderName = folderNameMap.get(f.folderId);
+        if (folderName?.toLowerCase().includes(term)) return true;
+      }
+      // Match assignee name
+      if (f.assigneeName?.toLowerCase().includes(term)) return true;
+      return false;
+    });
+  }, [myFiles, searchQuery, folderNameMap]);
 
   const filteredSharedFolders = useMemo(() => {
     if (!sharedFolders) return [];
     if (!searchQuery) return sharedFolders;
     const term = searchQuery.toLowerCase();
-    return sharedFolders.filter((f) => f.name.toLowerCase().includes(term));
+    return sharedFolders.filter(
+      (f) =>
+        f.name.toLowerCase().includes(term) ||
+        f.assigneeName?.toLowerCase().includes(term)
+    );
   }, [sharedFolders, searchQuery]);
 
   const filteredSharedFiles = useMemo(() => {
     if (!sharedFiles) return [];
     if (!searchQuery) return sharedFiles;
     const term = searchQuery.toLowerCase();
-    return sharedFiles.filter(
-      (f) =>
-        f.name.toLowerCase().includes(term) ||
-        f.tags?.some((tag) => tag.toLowerCase().includes(term))
-    );
-  }, [sharedFiles, searchQuery]);
+    return sharedFiles.filter((f) => {
+      // Match file name
+      if (f.name.toLowerCase().includes(term)) return true;
+      // Match tags
+      if (f.tags?.some((tag) => tag.toLowerCase().includes(term))) return true;
+      // Match folder name
+      if (f.folderId) {
+        const folderName = folderNameMap.get(f.folderId);
+        if (folderName?.toLowerCase().includes(term)) return true;
+      }
+      // Match assignee name
+      if (f.assigneeName?.toLowerCase().includes(term)) return true;
+      return false;
+    });
+  }, [sharedFiles, searchQuery, folderNameMap]);
 
   // Group files by assignee for owner view
   const groupedFiles = useMemo(() => {

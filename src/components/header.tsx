@@ -39,7 +39,7 @@ export function Header({
             <SearchIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-500" />
             <input
               type="text"
-              placeholder="Search files..."
+              placeholder="Search by name, tag, folder, or member..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               className={cn(
@@ -90,7 +90,7 @@ export function Header({
             <SearchIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-500" />
             <input
               type="text"
-              placeholder="Search files..."
+              placeholder="Search by name, tag, folder, or member..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               className={cn(
