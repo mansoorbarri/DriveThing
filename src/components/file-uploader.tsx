@@ -206,9 +206,31 @@ export function FileUploader({
     );
   };
 
+  // Get folders filtered by assignee
+  const getFoldersForAssignee = (assignedTo?: Id<"users">) => {
+    return folders.filter((folder) => {
+      // If no assignee selected (family/unassigned), show unassigned folders
+      if (!assignedTo) {
+        return !folder.assignedTo;
+      }
+      // Otherwise show folders assigned to that person
+      return folder.assignedTo === assignedTo;
+    });
+  };
+
   const updateAssignee = (index: number, assignedTo?: Id<"users">) => {
     setPendingFiles((prev) =>
-      prev.map((f, i) => (i === index ? { ...f, assignedTo } : f))
+      prev.map((f, i) => {
+        if (i !== index) return f;
+        // Reset folder if it doesn't belong to the new assignee
+        const validFolders = getFoldersForAssignee(assignedTo);
+        const folderStillValid = f.folderId && validFolders.some((folder) => folder._id === f.folderId);
+        return {
+          ...f,
+          assignedTo,
+          folderId: folderStillValid ? f.folderId : undefined,
+        };
+      })
     );
   };
 
@@ -405,35 +427,7 @@ export function FileUploader({
                 )}
               </p>
 
-              {/* Folder selection */}
-              {folders.length > 0 && (
-                <div className="mt-4">
-                  <label className="mb-1.5 block text-sm font-medium text-zinc-400">
-                    Folder
-                  </label>
-                  <select
-                    value={pending.folderId ?? ""}
-                    onChange={(e) =>
-                      updateFolder(
-                        index,
-                        e.target.value
-                          ? (e.target.value as Id<"folders">)
-                          : undefined
-                      )
-                    }
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
-                  >
-                    <option value="">Root (no folder)</option>
-                    {folders.map((folder) => (
-                      <option key={folder._id} value={folder._id}>
-                        {folder.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Assign to member */}
+              {/* Assign to member - shown first */}
               {assignableMembers.length > 0 && (
                 <div className="mt-4">
                   <label className="mb-1.5 block text-sm font-medium text-zinc-400">
@@ -461,6 +455,38 @@ export function FileUploader({
                   </select>
                 </div>
               )}
+
+              {/* Folder selection - filtered by assignee */}
+              {(() => {
+                const availableFolders = getFoldersForAssignee(pending.assignedTo);
+                if (availableFolders.length === 0) return null;
+                return (
+                  <div className="mt-4">
+                    <label className="mb-1.5 block text-sm font-medium text-zinc-400">
+                      Folder
+                    </label>
+                    <select
+                      value={pending.folderId ?? ""}
+                      onChange={(e) =>
+                        updateFolder(
+                          index,
+                          e.target.value
+                            ? (e.target.value as Id<"folders">)
+                            : undefined
+                        )
+                      }
+                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                    >
+                      <option value="">Root (no folder)</option>
+                      {availableFolders.map((folder) => (
+                        <option key={folder._id} value={folder._id}>
+                          {folder.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })()}
 
               {/* Tags */}
               <div className="mt-4">
