@@ -8,6 +8,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { Modal } from "./ui/modal";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
+import { cn } from "~/lib/utils";
 
 interface FamilyMember {
   _id: Id<"users">;
@@ -31,13 +32,21 @@ export function CreateFolderModal({
 }: CreateFolderModalProps) {
   const { user } = useUser();
   const [name, setName] = useState("");
-  const [assignedTo, setAssignedTo] = useState<Id<"users"> | undefined>();
+  const [assignedTo, setAssignedTo] = useState<Id<"users">[]>([]);
   const [isCreating, setIsCreating] = useState(false);
 
   const createFolder = useMutation(api.folders.createFolder);
 
   // All family members (including owner) can be assigned
   const assignableMembers = familyMembers;
+
+  const toggleAssignee = (memberId: Id<"users">) => {
+    setAssignedTo((prev) =>
+      prev.includes(memberId)
+        ? prev.filter((id) => id !== memberId)
+        : [...prev, memberId]
+    );
+  };
 
   const handleCreate = async () => {
     if (!user || !name.trim()) return;
@@ -47,11 +56,11 @@ export function CreateFolderModal({
       await createFolder({
         name: name.trim(),
         parentFolderId,
-        assignedTo,
+        assignedTo: assignedTo.length > 0 ? assignedTo : undefined,
         clerkId: user.id,
       });
       setName("");
-      setAssignedTo(undefined);
+      setAssignedTo([]);
       onClose();
     } finally {
       setIsCreating(false);
@@ -60,7 +69,7 @@ export function CreateFolderModal({
 
   const handleClose = () => {
     setName("");
-    setAssignedTo(undefined);
+    setAssignedTo([]);
     onClose();
   };
 
@@ -87,23 +96,66 @@ export function CreateFolderModal({
             <label className="mb-1.5 block text-sm font-medium text-zinc-400">
               Assign to (optional)
             </label>
-            <select
-              value={assignedTo ?? ""}
-              onChange={(e) =>
-                setAssignedTo(
-                  e.target.value ? (e.target.value as Id<"users">) : undefined
-                )
-              }
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
-            >
-              <option value="">Unassigned (family folder)</option>
-              {assignableMembers.map((member) => (
-                <option key={member._id} value={member._id}>
-                  {member.name}
-                  {member.role === "owner" ? " (Me)" : ""}
-                </option>
-              ))}
-            </select>
+            <p className="mb-2 text-xs text-zinc-500">
+              Select one or more people, or leave empty for a family folder
+            </p>
+            <div className="space-y-2">
+              {assignableMembers.map((member) => {
+                const isSelected = assignedTo.includes(member._id);
+                return (
+                  <button
+                    key={member._id}
+                    type="button"
+                    onClick={() => toggleAssignee(member._id)}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
+                      isSelected
+                        ? "border-violet-500 bg-violet-500/10"
+                        : "border-zinc-700 hover:bg-zinc-800"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "flex h-5 w-5 items-center justify-center rounded border",
+                        isSelected
+                          ? "border-violet-500 bg-violet-500"
+                          : "border-zinc-600 bg-zinc-800"
+                      )}
+                    >
+                      {isSelected && (
+                        <svg
+                          className="h-3 w-3 text-white"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={3}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-700 text-sm text-zinc-300">
+                      {member.name[0]?.toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-zinc-200">
+                        {member.name}
+                        {member.role === "owner" ? " (Me)" : ""}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {assignedTo.length === 0 && (
+              <p className="mt-2 text-xs text-zinc-500">
+                This will be a family folder visible to everyone
+              </p>
+            )}
           </div>
         )}
 

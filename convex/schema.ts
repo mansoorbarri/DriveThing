@@ -30,14 +30,13 @@ export default defineSchema({
     name: v.string(),
     parentFolderId: v.optional(v.id("folders")), // For nesting
     createdBy: v.id("users"),
-    assignedTo: v.optional(v.id("users")),
+    assignedTo: v.optional(v.array(v.id("users"))), // Multiple assignees
     familyId: v.id("families"),
     sharedWithFamily: v.boolean(),
     sharedWith: v.optional(v.array(v.id("users"))),
     createdAt: v.number(),
   })
     .index("by_family", ["familyId"])
-    .index("by_assigned", ["assignedTo"])
     .index("by_parent", ["parentFolderId"])
     .index("by_family_shared", ["familyId", "sharedWithFamily"]),
 
