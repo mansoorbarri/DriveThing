@@ -5,10 +5,9 @@ const f = createUploadthing();
 
 export const ourFileRouter = {
   // General file uploader - supports PDFs, images, spreadsheets
+  // Using blob to allow mixed file types in a single upload
   fileUploader: f({
-    pdf: { maxFileSize: "64MB", maxFileCount: 10 },
-    image: { maxFileSize: "32MB", maxFileCount: 10 },
-    blob: { maxFileSize: "64MB", maxFileCount: 10 }, // For Excel files
+    blob: { maxFileSize: "64MB", maxFileCount: 20 },
   })
     .middleware(async () => {
       const { userId } = await auth();
