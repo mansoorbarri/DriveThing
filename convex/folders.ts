@@ -535,7 +535,7 @@ export const getFolderContents = query({
 
     return {
       folder: { ...folder, assigneeName },
-      files: filesWithInfo.sort((a, b) => b.createdAt - a.createdAt),
+      files: filesWithInfo.sort((a, b) => a.name.localeCompare(b.name)),
       subfolders: subfoldersWithInfo.sort((a, b) => a.name.localeCompare(b.name)),
     };
   },
@@ -602,12 +602,15 @@ export const getAllFoldersForPicker = query({
 
     const myFolders = allFolders.filter((f) => f.createdBy === user._id);
 
-    return myFolders.map((folder) => ({
-      _id: folder._id,
-      name: folder.name,
-      parentFolderId: folder.parentFolderId,
-      assignedTo: folder.assignedTo,
-    }));
+    // Sort alphabetically by name
+    return myFolders
+      .map((folder) => ({
+        _id: folder._id,
+        name: folder.name,
+        parentFolderId: folder.parentFolderId,
+        assignedTo: folder.assignedTo,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   },
 });
 

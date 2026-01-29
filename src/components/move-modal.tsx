@@ -125,9 +125,10 @@ export function MoveModal({
       }
     }
 
-    // Other members' folders
+    // Other members' folders (sorted alphabetically)
     members
       .filter((m) => m.role !== "owner")
+      .sort((a, b) => a.name.localeCompare(b.name))
       .forEach((member) => {
         const memberFolders = rootNodes.filter((f) => f.assignedTo === member._id);
         if (memberFolders.length > 0) {

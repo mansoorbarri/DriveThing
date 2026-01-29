@@ -4,8 +4,8 @@ import { auth } from "@clerk/nextjs/server";
 const f = createUploadthing();
 
 export const ourFileRouter = {
-  // General file uploader - supports PDFs, images, spreadsheets
-  // Using blob to allow mixed file types in a single upload
+  // General file uploader - supports all file types
+  // Using blob to allow any file type
   fileUploader: f({
     blob: { maxFileSize: "64MB", maxFileCount: 50 },
   })

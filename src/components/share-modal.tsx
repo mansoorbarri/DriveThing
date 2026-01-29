@@ -46,11 +46,17 @@ export function ShareModal({
 
   const updateSharing = useMutation(api.files.updateFileSharing);
 
-  // Filter out the current user from the list (match by email)
+  // Filter out the current user from the list (match by email) and sort alphabetically
   const currentUserEmail = user?.primaryEmailAddress?.emailAddress;
-  const otherMembers = familyMembers.filter(
-    (m) => m.email !== currentUserEmail
-  );
+  const otherMembers = familyMembers
+    .filter((m) => m.email !== currentUserEmail)
+    .sort((a, b) => {
+      // Owner first
+      if (a.role === "owner" && b.role !== "owner") return -1;
+      if (b.role === "owner" && a.role !== "owner") return 1;
+      // Then alphabetically
+      return a.name.localeCompare(b.name);
+    });
 
   const handleToggleMember = (memberId: Id<"users">) => {
     setSelectedMembers((prev) =>

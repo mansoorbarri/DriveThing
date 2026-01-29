@@ -920,10 +920,17 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* Shared files grouped by assignee */}
+                {/* Shared files grouped by assignee - sorted alphabetically, Family Documents last */}
                 {groupedSharedFiles &&
-                  Object.entries(groupedSharedFiles).map(
-                    ([assigneeId, group]) => (
+                  Object.entries(groupedSharedFiles)
+                    .sort(([, a], [, b]) => {
+                      // Family Documents always last
+                      if (a.assigneeName === "Family Documents") return 1;
+                      if (b.assigneeName === "Family Documents") return -1;
+                      // Otherwise alphabetical by assignee name
+                      return a.assigneeName.localeCompare(b.assigneeName);
+                    })
+                    .map(([assigneeId, group]) => (
                       <div key={assigneeId}>
                         <h3 className="mb-4 text-sm font-medium text-zinc-400">
                           {group.assigneeName === "Family Documents"

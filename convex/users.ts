@@ -72,6 +72,15 @@ export const getUserWithFamily = query({
       .withIndex("by_family", (q) => q.eq("familyId", user.familyId))
       .collect();
 
-    return { user, family, members };
+    // Sort members: owner first, then alphabetically by name
+    const sortedMembers = members.sort((a, b) => {
+      // Owner always first
+      if (a.role === "owner" && b.role !== "owner") return -1;
+      if (b.role === "owner" && a.role !== "owner") return 1;
+      // Then alphabetically by name
+      return a.name.localeCompare(b.name);
+    });
+
+    return { user, family, members: sortedMembers };
   },
 });

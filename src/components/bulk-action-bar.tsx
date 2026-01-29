@@ -403,8 +403,16 @@ function BulkMoveModal({
           <span>Root (no folder)</span>
         </button>
 
-        {/* Grouped folders */}
-        {members.map((member) => {
+        {/* Grouped folders - owner first, then alphabetically, family folders handled separately */}
+        {[...members]
+          .sort((a, b) => {
+            // Owner first
+            if (a.role === "owner" && b.role !== "owner") return -1;
+            if (b.role === "owner" && a.role !== "owner") return 1;
+            // Then alphabetically
+            return a.name.localeCompare(b.name);
+          })
+          .map((member) => {
           const memberFolders = groupedFolders?.[member._id] ?? [];
           if (memberFolders.length === 0) return null;
           const isExpanded = expandedGroups.has(member._id);

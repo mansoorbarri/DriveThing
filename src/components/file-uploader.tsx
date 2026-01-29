@@ -88,12 +88,13 @@ function getExtension(filename: string): string {
   return lastDot !== -1 ? filename.slice(lastDot) : "";
 }
 
-// Accepted file types for filtering
-const ACCEPTED_EXTENSIONS = [".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".xls", ".xlsx", ".doc", ".docx"];
-
-function isAcceptedFile(filename: string): boolean {
-  const ext = getExtension(filename).toLowerCase();
-  return ACCEPTED_EXTENSIONS.includes(ext);
+// Check if file should be excluded (hidden files, system files, etc.)
+function shouldExcludeFile(filename: string): boolean {
+  // Exclude hidden files and common system files
+  if (filename.startsWith(".")) return true;
+  if (filename === "Thumbs.db" || filename === "desktop.ini") return true;
+  if (filename === ".DS_Store") return true;
+  return false;
 }
 
 // Read a FileSystemEntry recursively to get all files with their paths
@@ -109,7 +110,7 @@ async function readEntryRecursively(
     const file = await new Promise<File>((resolve, reject) => {
       fileEntry.file(resolve, reject);
     });
-    if (isAcceptedFile(file.name)) {
+    if (!shouldExcludeFile(file.name)) {
       files.push({ file, relativePath: path });
     }
   } else if (entry.isDirectory) {
@@ -543,18 +544,7 @@ export function FileUploader({
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: {
-      "application/pdf": [".pdf"],
-      "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp"],
-      "application/vnd.ms-excel": [".xls"],
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
-        ".xlsx",
-      ],
-      "application/msword": [".doc"],
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
-        ".docx",
-      ],
-    },
+    // Accept all file types
     maxSize: 64 * 1024 * 1024, // 64MB (will be compressed if image)
     disabled: isUploading || isProcessing,
     // Disable react-dropzone's built-in drop handling so we can intercept folders
@@ -615,7 +605,7 @@ export function FileUploader({
           </p>
           <p className="mt-1 text-sm text-zinc-500">or tap to select files</p>
           <p className="mt-3 text-xs text-zinc-600">
-            PDF, images, Word, and Excel files. Folders will preserve their structure.
+            Any file type up to 64MB. Folders will preserve their structure.
           </p>
         </div>
       )}

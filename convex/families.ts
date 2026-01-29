@@ -147,10 +147,17 @@ export const getFamily = query({
 export const getFamilyMembers = query({
   args: { familyId: v.id("families") },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const members = await ctx.db
       .query("users")
       .withIndex("by_family", (q) => q.eq("familyId", args.familyId))
       .collect();
+
+    // Sort: owner first, then alphabetically by name
+    return members.sort((a, b) => {
+      if (a.role === "owner" && b.role !== "owner") return -1;
+      if (b.role === "owner" && a.role !== "owner") return 1;
+      return a.name.localeCompare(b.name);
+    });
   },
 });
 

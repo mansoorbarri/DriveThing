@@ -93,7 +93,8 @@ export const getAllFamilyFiles = query({
       })
     );
 
-    return filesWithAssignee;
+    // Sort alphabetically by name
+    return filesWithAssignee.sort((a, b) => a.name.localeCompare(b.name));
   },
 });
 
@@ -174,7 +175,8 @@ export const getMyFiles = query({
       })
     );
 
-    return filesWithAssignee;
+    // Sort alphabetically by name
+    return filesWithAssignee.sort((a, b) => a.name.localeCompare(b.name));
   },
 });
 
@@ -272,7 +274,8 @@ export const getSharedFiles = query({
       })
     );
 
-    return filesWithInfo;
+    // Sort alphabetically by name
+    return filesWithInfo.sort((a, b) => a.name.localeCompare(b.name));
   },
 });
 
@@ -536,12 +539,14 @@ export const searchFiles = query({
       return false;
     });
 
-    // Enrich with folder and assignee names
-    return matchingFiles.map((file) => ({
-      ...file,
-      folderName: file.folderId ? folderMap.get(file.folderId) : undefined,
-      assigneeName: file.assignedTo ? memberMap.get(file.assignedTo) : undefined,
-    }));
+    // Enrich with folder and assignee names and sort alphabetically
+    return matchingFiles
+      .map((file) => ({
+        ...file,
+        folderName: file.folderId ? folderMap.get(file.folderId) : undefined,
+        assigneeName: file.assignedTo ? memberMap.get(file.assignedTo) : undefined,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   },
 });
 
