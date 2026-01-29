@@ -21,7 +21,7 @@ import {
   DashboardSkeleton,
   GroupedFilesSkeleton,
 } from "~/components/ui/skeleton";
-import { PlusIcon, FileIcon, UploadIcon, FolderIcon } from "~/components/icons";
+import { PlusIcon, FileIcon, UploadIcon, FolderIcon, ChevronRightIcon } from "~/components/icons";
 import { cn } from "~/lib/utils";
 
 type Tab = "my-files" | "shared";
@@ -42,6 +42,8 @@ export default function DashboardPage() {
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [currentFolderId, setCurrentFolderId] = useState<Id<"folders"> | undefined>();
   const [moveTarget, setMoveTarget] = useState<MoveTarget | null>(null);
+  // Track sections that user has manually toggled (stores the toggled state)
+  const [toggledSections, setToggledSections] = useState<Map<string, boolean>>(new Map());
 
   // Sync user with Convex
   const getOrCreateUser = useMutation(api.users.getOrCreateUser);
@@ -294,6 +296,30 @@ export default function DashboardPage() {
   const currentUser = userWithFamily.user;
   const isOwner = currentUser?.role === "owner";
 
+  // Get current user's member ID for default expanded section
+  const currentUserMemberId = currentUser?._id;
+
+  // Check if a section should be expanded
+  // Default: current user's section is expanded, others are collapsed
+  const isSectionExpanded = (sectionId: string) => {
+    // If user has manually toggled this section, use that state
+    if (toggledSections.has(sectionId)) {
+      return toggledSections.get(sectionId)!;
+    }
+    // Default: only current user's section is expanded
+    return sectionId === currentUserMemberId;
+  };
+
+  // Toggle section expansion
+  const toggleSection = (sectionId: string) => {
+    setToggledSections((prev) => {
+      const next = new Map(prev);
+      const currentState = isSectionExpanded(sectionId);
+      next.set(sectionId, !currentState);
+      return next;
+    });
+  };
+
   // Render file card with move handler
   const renderFileCard = (file: (typeof filteredMyFiles)[0]) => (
     <FileCard
@@ -492,18 +518,30 @@ export default function DashboardPage() {
                   );
                   const ownerFiles = groupedFiles[ownerMember?._id ?? ""] ?? [];
                   if (ownerFolders.length === 0 && ownerFiles.length === 0) return null;
+                  const isExpanded = isSectionExpanded(ownerMember._id);
                   return (
                     <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-4">
-                      <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-violet-400">
+                      <button
+                        onClick={() => toggleSection(ownerMember._id)}
+                        className="mb-0 flex w-full items-center gap-2 text-left text-sm font-medium text-violet-400 hover:text-violet-300"
+                      >
+                        <ChevronRightIcon
+                          className={cn(
+                            "h-4 w-4 transition-transform",
+                            isExpanded && "rotate-90"
+                          )}
+                        />
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-500/20 text-xs">
                           {ownerMember?.name[0]?.toUpperCase()}
                         </span>
                         {ownerMember?.name}&apos;s Items ({ownerFolders.length + ownerFiles.length})
-                      </h3>
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {ownerFolders.map(renderFolderCard)}
-                        {ownerFiles.map((file) => renderFileCard(file))}
-                      </div>
+                      </button>
+                      {isExpanded && (
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {ownerFolders.map(renderFolderCard)}
+                          {ownerFiles.map((file) => renderFileCard(file))}
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
@@ -517,18 +555,30 @@ export default function DashboardPage() {
                     );
                     const memberFiles = groupedFiles[member._id] ?? [];
                     if (memberFolders.length === 0 && memberFiles.length === 0) return null;
+                    const isExpanded = isSectionExpanded(member._id);
                     return (
-                      <div key={member._id}>
-                        <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-zinc-400">
+                      <div key={member._id} className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
+                        <button
+                          onClick={() => toggleSection(member._id)}
+                          className="mb-0 flex w-full items-center gap-2 text-left text-sm font-medium text-zinc-400 hover:text-zinc-300"
+                        >
+                          <ChevronRightIcon
+                            className={cn(
+                              "h-4 w-4 transition-transform",
+                              isExpanded && "rotate-90"
+                            )}
+                          />
                           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-700 text-xs text-zinc-300">
                             {member.name[0]?.toUpperCase()}
                           </span>
                           {member.name}&apos;s Items ({memberFolders.length + memberFiles.length})
-                        </h3>
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                          {memberFolders.map(renderFolderCard)}
-                          {memberFiles.map((file) => renderFileCard(file))}
-                        </div>
+                        </button>
+                        {isExpanded && (
+                          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            {memberFolders.map(renderFolderCard)}
+                            {memberFiles.map((file) => renderFileCard(file))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -538,15 +588,27 @@ export default function DashboardPage() {
                   const unassignedFolders = filteredMyFolders.filter((f) => !f.assignedTo);
                   const unassignedFiles = groupedFiles.unassigned ?? [];
                   if (unassignedFolders.length === 0 && unassignedFiles.length === 0) return null;
+                  const isExpanded = isSectionExpanded("unassigned");
                   return (
-                    <div>
-                      <h3 className="mb-4 text-sm font-medium text-zinc-400">
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
+                      <button
+                        onClick={() => toggleSection("unassigned")}
+                        className="mb-0 flex w-full items-center gap-2 text-left text-sm font-medium text-zinc-400 hover:text-zinc-300"
+                      >
+                        <ChevronRightIcon
+                          className={cn(
+                            "h-4 w-4 transition-transform",
+                            isExpanded && "rotate-90"
+                          )}
+                        />
                         Family Items ({unassignedFolders.length + unassignedFiles.length})
-                      </h3>
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {unassignedFolders.map(renderFolderCard)}
-                        {unassignedFiles.map((file) => renderFileCard(file))}
-                      </div>
+                      </button>
+                      {isExpanded && (
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {unassignedFolders.map(renderFolderCard)}
+                          {unassignedFiles.map((file) => renderFileCard(file))}
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
