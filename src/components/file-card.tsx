@@ -212,21 +212,25 @@ export function FileCard({
             : "border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 active:bg-zinc-800"
         )}
       >
-        {/* Selection checkbox */}
-        {(selectionMode || isSelected) && isOwner && (
+        {/* Selection checkbox - shows on hover or when selected/in selection mode */}
+        {isOwner && onToggleSelect && (
           <label
             className={cn(
-              "absolute left-3 top-3 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-2 transition-colors",
+              "absolute left-3 top-3 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-2 transition-all",
               isSelected
                 ? "border-violet-500 bg-violet-500"
-                : "border-zinc-600 bg-zinc-900/90 hover:border-zinc-500"
+                : "border-zinc-600 bg-zinc-900/90 hover:border-violet-500 hover:bg-violet-500/20",
+              // Show on hover, always show if selected or in selection mode
+              isSelected || selectionMode
+                ? "opacity-100"
+                : "opacity-0 group-hover:opacity-100"
             )}
             onClick={(e) => e.stopPropagation()}
           >
             <input
               type="checkbox"
               checked={isSelected}
-              onChange={() => onToggleSelect?.(id)}
+              onChange={() => onToggleSelect(id)}
               className="sr-only"
             />
             {isSelected && (
