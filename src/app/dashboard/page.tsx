@@ -47,6 +47,8 @@ export default function DashboardPage() {
   const [toggledSections, setToggledSections] = useState<Map<string, boolean>>(new Map());
   // Track selected files for bulk actions
   const [selectedFiles, setSelectedFiles] = useState<Set<Id<"files">>>(new Set());
+  // Floating action button menu
+  const [showFabMenu, setShowFabMenu] = useState(false);
 
   // Sync user with Convex
   const getOrCreateUser = useMutation(api.users.getOrCreateUser);
@@ -507,19 +509,6 @@ export default function DashboardPage() {
           <FolderBreadcrumb path={folderPath} onNavigate={navigateToFolder} />
         )}
 
-        {/* New Folder button for owner */}
-        {isOwner && activeTab === "my-files" && (
-          <div className="mb-4 flex justify-end">
-            <button
-              onClick={() => setShowCreateFolder(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700"
-            >
-              <FolderIcon className="h-4 w-4" />
-              New folder
-            </button>
-          </div>
-        )}
-
         {/* My Files tab */}
         {activeTab === "my-files" && (
           <>
@@ -933,20 +922,60 @@ export default function DashboardPage() {
         )}
       </main>
 
-      {/* Floating upload button - only for owner */}
+      {/* Floating action button - only for owner */}
       {isOwner && (
-        <button
-          onClick={() => setShowUploader(true)}
-          className={cn(
-            "fixed right-6 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-violet-600 text-white shadow-lg transition-all",
-            "hover:bg-violet-500 active:bg-violet-700",
-            "md:right-8",
-            selectionMode ? "bottom-20 md:bottom-24" : "bottom-6 md:bottom-8"
+        <div className={cn(
+          "fixed right-6 z-20 md:right-8",
+          selectionMode ? "bottom-20 md:bottom-24" : "bottom-6 md:bottom-8"
+        )}>
+          {/* FAB Menu */}
+          {showFabMenu && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setShowFabMenu(false)}
+              />
+              <div className="absolute bottom-16 right-0 z-20 mb-2 flex flex-col items-end gap-2">
+                <button
+                  onClick={() => {
+                    setShowFabMenu(false);
+                    setShowCreateFolder(true);
+                  }}
+                  className="flex items-center gap-3 rounded-full bg-zinc-800 py-2 pl-4 pr-3 text-sm font-medium text-zinc-200 shadow-lg transition-colors hover:bg-zinc-700"
+                >
+                  <span>New folder</span>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500 text-white">
+                    <FolderIcon className="h-5 w-5" />
+                  </span>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowFabMenu(false);
+                    setShowUploader(true);
+                  }}
+                  className="flex items-center gap-3 rounded-full bg-zinc-800 py-2 pl-4 pr-3 text-sm font-medium text-zinc-200 shadow-lg transition-colors hover:bg-zinc-700"
+                >
+                  <span>Upload files</span>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500 text-white">
+                    <UploadIcon className="h-5 w-5" />
+                  </span>
+                </button>
+              </div>
+            </>
           )}
-          aria-label="Upload files"
-        >
-          <PlusIcon className="h-6 w-6" />
-        </button>
+          {/* Main FAB */}
+          <button
+            onClick={() => setShowFabMenu(!showFabMenu)}
+            className={cn(
+              "flex h-14 w-14 items-center justify-center rounded-full bg-violet-600 text-white shadow-lg transition-all",
+              "hover:bg-violet-500 active:bg-violet-700",
+              showFabMenu && "rotate-45 bg-zinc-700 hover:bg-zinc-600"
+            )}
+            aria-label="Add new"
+          >
+            <PlusIcon className="h-6 w-6" />
+          </button>
+        </div>
       )}
 
       {/* Upload modal */}
