@@ -981,7 +981,7 @@ export default function DashboardPage() {
                     setShowFabMenu(false);
                     setShowCreateFolder(true);
                   }}
-                  className="flex items-center gap-3 rounded-full bg-zinc-800 py-2 pl-4 pr-3 text-sm font-medium text-zinc-200 shadow-lg transition-colors hover:bg-zinc-700"
+                  className="flex items-center gap-3 whitespace-nowrap rounded-full bg-zinc-800 py-2 pl-4 pr-3 text-sm font-medium text-zinc-200 shadow-lg transition-colors hover:bg-zinc-700"
                 >
                   <span>New folder</span>
                   <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500 text-white">
@@ -993,7 +993,7 @@ export default function DashboardPage() {
                     setShowFabMenu(false);
                     setShowUploader(true);
                   }}
-                  className="flex items-center gap-3 rounded-full bg-zinc-800 py-2 pl-4 pr-3 text-sm font-medium text-zinc-200 shadow-lg transition-colors hover:bg-zinc-700"
+                  className="flex items-center gap-3 whitespace-nowrap rounded-full bg-zinc-800 py-2 pl-4 pr-3 text-sm font-medium text-zinc-200 shadow-lg transition-colors hover:bg-zinc-700"
                 >
                   <span>Upload files</span>
                   <span className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500 text-white">
