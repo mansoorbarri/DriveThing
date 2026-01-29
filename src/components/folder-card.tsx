@@ -41,6 +41,10 @@ interface FolderCardProps {
   parentFolderName?: string; // For showing location in search results
   onClick: () => void;
   onMoveClick?: () => void;
+  // Selection props
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (id: Id<"folders">) => void;
 }
 
 export function FolderCard({
@@ -56,6 +60,9 @@ export function FolderCard({
   parentFolderName,
   onClick,
   onMoveClick,
+  selectionMode = false,
+  isSelected = false,
+  onToggleSelect,
 }: FolderCardProps) {
   const { user } = useUser();
   const [showMenu, setShowMenu] = useState(false);
@@ -162,8 +169,17 @@ export function FolderCard({
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Don't open folder if clicking menu button or dropdown
+    // Don't open folder if clicking menu button, dropdown, or checkbox
     if ((e.target as HTMLElement).closest("button")) return;
+    if ((e.target as HTMLElement).closest("input[type='checkbox']")) return;
+    if ((e.target as HTMLElement).closest("label")) return;
+
+    // In selection mode, toggle selection instead of opening folder
+    if (selectionMode && onToggleSelect) {
+      onToggleSelect(id);
+      return;
+    }
+
     onClick();
   };
 
@@ -171,8 +187,48 @@ export function FolderCard({
     <>
       <div
         onClick={handleCardClick}
-        className="group relative cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900 transition-all hover:border-zinc-700 hover:bg-zinc-800/50 active:bg-zinc-800"
+        className={cn(
+          "group relative cursor-pointer rounded-xl border bg-zinc-900 transition-all",
+          isSelected
+            ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500/50"
+            : "border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 active:bg-zinc-800"
+        )}
       >
+        {/* Selection checkbox - shows on hover or when selected/in selection mode */}
+        {isOwner && onToggleSelect && (
+          <label
+            className={cn(
+              "absolute left-3 top-3 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-2 transition-all",
+              isSelected
+                ? "border-violet-500 bg-violet-500"
+                : "border-zinc-600 bg-zinc-900/90 hover:border-violet-500 hover:bg-violet-500/20",
+              // Show on hover, always show if selected or in selection mode
+              isSelected || selectionMode
+                ? "opacity-100"
+                : "opacity-0 group-hover:opacity-100"
+            )}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => onToggleSelect(id)}
+              className="sr-only"
+            />
+            {isSelected && (
+              <svg
+                className="h-4 w-4 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={3}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+          </label>
+        )}
+
         <div className="p-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400">
             <FolderIcon className="h-6 w-6" />

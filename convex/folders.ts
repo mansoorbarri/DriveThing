@@ -610,3 +610,138 @@ export const getAllFoldersForPicker = query({
     }));
   },
 });
+
+// Bulk delete folders - OWNER ONLY
+export const bulkDeleteFolders = mutation({
+  args: {
+    folderIds: v.array(v.id("folders")),
+    deleteContents: v.boolean(),
+    clerkId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+
+    if (!user || user.role !== "owner") {
+      throw new Error("Only owners can delete folders");
+    }
+
+    const fileKeysToDelete: string[] = [];
+
+    for (const folderId of args.folderIds) {
+      const folder = await ctx.db.get(folderId);
+      if (!folder || folder.createdBy !== user._id) continue;
+
+      // Get files in this folder
+      const filesInFolder = await ctx.db
+        .query("files")
+        .withIndex("by_folder", (q) => q.eq("folderId", folderId))
+        .collect();
+
+      // Get subfolders
+      const subfolders = await ctx.db
+        .query("folders")
+        .withIndex("by_parent", (q) => q.eq("parentFolderId", folderId))
+        .collect();
+
+      if (args.deleteContents) {
+        // Delete all files in this folder
+        for (const file of filesInFolder) {
+          fileKeysToDelete.push(file.fileKey);
+          await ctx.db.delete(file._id);
+        }
+        // Delete subfolders (recursively handled by their own deletion)
+        for (const subfolder of subfolders) {
+          await ctx.db.delete(subfolder._id);
+        }
+      } else {
+        // Move files to parent folder
+        for (const file of filesInFolder) {
+          await ctx.db.patch(file._id, { folderId: folder.parentFolderId });
+        }
+        // Move subfolders to parent folder
+        for (const subfolder of subfolders) {
+          await ctx.db.patch(subfolder._id, { parentFolderId: folder.parentFolderId });
+        }
+      }
+
+      await ctx.db.delete(folderId);
+    }
+
+    return { fileKeysToDelete };
+  },
+});
+
+// Bulk move folders - OWNER ONLY
+export const bulkMoveFolders = mutation({
+  args: {
+    folderIds: v.array(v.id("folders")),
+    newParentFolderId: v.optional(v.id("folders")),
+    clerkId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+
+    if (!user || user.role !== "owner") {
+      throw new Error("Only owners can move folders");
+    }
+
+    // Validate target folder if provided
+    if (args.newParentFolderId) {
+      const targetFolder = await ctx.db.get(args.newParentFolderId);
+      if (!targetFolder || targetFolder.familyId !== user.familyId) {
+        throw new Error("Target folder not found");
+      }
+    }
+
+    for (const folderId of args.folderIds) {
+      const folder = await ctx.db.get(folderId);
+      if (!folder || folder.createdBy !== user._id) continue;
+
+      // Prevent moving folder into itself or descendants
+      if (args.newParentFolderId) {
+        let currentParent: Id<"folders"> | undefined = args.newParentFolderId;
+        while (currentParent) {
+          if (currentParent === folderId) {
+            continue; // Skip this folder, can't move into itself
+          }
+          const parentFolder = await ctx.db.get(currentParent);
+          currentParent = parentFolder?.parentFolderId;
+        }
+      }
+
+      await ctx.db.patch(folderId, { parentFolderId: args.newParentFolderId });
+    }
+  },
+});
+
+// Bulk assign folders - OWNER ONLY
+export const bulkAssignFolders = mutation({
+  args: {
+    folderIds: v.array(v.id("folders")),
+    assignedTo: v.optional(v.id("users")),
+    clerkId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+
+    if (!user || user.role !== "owner") {
+      throw new Error("Only owners can assign folders");
+    }
+
+    for (const folderId of args.folderIds) {
+      const folder = await ctx.db.get(folderId);
+      if (folder && folder.createdBy === user._id) {
+        await ctx.db.patch(folderId, { assignedTo: args.assignedTo });
+      }
+    }
+  },
+});

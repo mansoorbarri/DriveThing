@@ -45,8 +45,9 @@ export default function DashboardPage() {
   const [moveTarget, setMoveTarget] = useState<MoveTarget | null>(null);
   // Track sections that user has manually toggled (stores the toggled state)
   const [toggledSections, setToggledSections] = useState<Map<string, boolean>>(new Map());
-  // Track selected files for bulk actions
+  // Track selected files and folders for bulk actions
   const [selectedFiles, setSelectedFiles] = useState<Set<Id<"files">>>(new Set());
+  const [selectedFolders, setSelectedFolders] = useState<Set<Id<"folders">>>(new Set());
   // Floating action button menu
   const [showFabMenu, setShowFabMenu] = useState(false);
 
@@ -339,53 +340,83 @@ export default function DashboardPage() {
     });
   };
 
+  // Toggle folder selection
+  const toggleFolderSelection = (folderId: Id<"folders">) => {
+    setSelectedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(folderId)) {
+        next.delete(folderId);
+      } else {
+        next.add(folderId);
+      }
+      return next;
+    });
+  };
+
   // Clear all selections
   const clearSelection = () => {
     setSelectedFiles(new Set());
+    setSelectedFolders(new Set());
   };
 
-  // Select all files in a group
-  const selectAllInGroup = (fileIds: Id<"files">[]) => {
+  // Select all items in a group
+  const selectAllInGroup = (fileIds: Id<"files">[], folderIds: Id<"folders">[]) => {
     setSelectedFiles((prev) => {
       const next = new Set(prev);
       fileIds.forEach((id) => next.add(id));
       return next;
     });
+    setSelectedFolders((prev) => {
+      const next = new Set(prev);
+      folderIds.forEach((id) => next.add(id));
+      return next;
+    });
   };
 
-  // Deselect all files in a group
-  const deselectAllInGroup = (fileIds: Id<"files">[]) => {
+  // Deselect all items in a group
+  const deselectAllInGroup = (fileIds: Id<"files">[], folderIds: Id<"folders">[]) => {
     setSelectedFiles((prev) => {
       const next = new Set(prev);
       fileIds.forEach((id) => next.delete(id));
       return next;
     });
+    setSelectedFolders((prev) => {
+      const next = new Set(prev);
+      folderIds.forEach((id) => next.delete(id));
+      return next;
+    });
   };
 
-  // Check if all files in a group are selected
-  const areAllSelected = (fileIds: Id<"files">[]) => {
-    if (fileIds.length === 0) return false;
-    return fileIds.every((id) => selectedFiles.has(id));
+  // Check if all items in a group are selected
+  const areAllSelected = (fileIds: Id<"files">[], folderIds: Id<"folders">[]) => {
+    const totalItems = fileIds.length + folderIds.length;
+    if (totalItems === 0) return false;
+    const allFilesSelected = fileIds.every((id) => selectedFiles.has(id));
+    const allFoldersSelected = folderIds.every((id) => selectedFolders.has(id));
+    return allFilesSelected && allFoldersSelected;
   };
 
-  // Check if some (but not all) files in a group are selected
-  const areSomeSelected = (fileIds: Id<"files">[]) => {
-    if (fileIds.length === 0) return false;
-    const selectedCount = fileIds.filter((id) => selectedFiles.has(id)).length;
-    return selectedCount > 0 && selectedCount < fileIds.length;
+  // Check if some (but not all) items in a group are selected
+  const areSomeSelected = (fileIds: Id<"files">[], folderIds: Id<"folders">[]) => {
+    const totalItems = fileIds.length + folderIds.length;
+    if (totalItems === 0) return false;
+    const selectedFileCount = fileIds.filter((id) => selectedFiles.has(id)).length;
+    const selectedFolderCount = folderIds.filter((id) => selectedFolders.has(id)).length;
+    const totalSelected = selectedFileCount + selectedFolderCount;
+    return totalSelected > 0 && totalSelected < totalItems;
   };
 
   // Toggle select all for a group
-  const toggleSelectAll = (fileIds: Id<"files">[]) => {
-    if (areAllSelected(fileIds)) {
-      deselectAllInGroup(fileIds);
+  const toggleSelectAll = (fileIds: Id<"files">[], folderIds: Id<"folders">[]) => {
+    if (areAllSelected(fileIds, folderIds)) {
+      deselectAllInGroup(fileIds, folderIds);
     } else {
-      selectAllInGroup(fileIds);
+      selectAllInGroup(fileIds, folderIds);
     }
   };
 
   // Check if we're in selection mode
-  const selectionMode = selectedFiles.size > 0;
+  const selectionMode = selectedFiles.size > 0 || selectedFolders.size > 0;
 
   // Render file card with move handler
   const renderFileCard = (file: (typeof filteredMyFiles)[0]) => (
@@ -449,6 +480,9 @@ export default function DashboardPage() {
               })
           : undefined
       }
+      selectionMode={selectionMode}
+      isSelected={selectedFolders.has(folder._id)}
+      onToggleSelect={toggleFolderSelection}
     />
   );
 
@@ -579,8 +613,10 @@ export default function DashboardPage() {
                   if (ownerFolders.length === 0 && ownerFiles.length === 0) return null;
                   const isExpanded = isSectionExpanded(ownerMember._id);
                   const fileIds = ownerFiles.map((f) => f._id);
-                  const allSelected = areAllSelected(fileIds);
-                  const someSelected = areSomeSelected(fileIds);
+                  const folderIds = ownerFolders.map((f) => f._id);
+                  const allSelected = areAllSelected(fileIds, folderIds);
+                  const someSelected = areSomeSelected(fileIds, folderIds);
+                  const hasItems = ownerFiles.length > 0 || ownerFolders.length > 0;
                   return (
                     <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-4">
                       <div className="flex items-center justify-between">
@@ -599,7 +635,7 @@ export default function DashboardPage() {
                           </span>
                           {ownerMember?.name}&apos;s Items ({ownerFolders.length + ownerFiles.length})
                         </button>
-                        {ownerFiles.length > 0 && (
+                        {hasItems && (
                           <label
                             className={cn(
                               "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-violet-500/10",
@@ -626,7 +662,7 @@ export default function DashboardPage() {
                             <input
                               type="checkbox"
                               checked={allSelected}
-                              onChange={() => toggleSelectAll(fileIds)}
+                              onChange={() => toggleSelectAll(fileIds, folderIds)}
                               className="sr-only"
                             />
                             Select all
@@ -654,8 +690,10 @@ export default function DashboardPage() {
                     if (memberFolders.length === 0 && memberFiles.length === 0) return null;
                     const isExpanded = isSectionExpanded(member._id);
                     const fileIds = memberFiles.map((f) => f._id);
-                    const allSelected = areAllSelected(fileIds);
-                    const someSelected = areSomeSelected(fileIds);
+                    const folderIds = memberFolders.map((f) => f._id);
+                    const allSelected = areAllSelected(fileIds, folderIds);
+                    const someSelected = areSomeSelected(fileIds, folderIds);
+                    const hasItems = memberFiles.length > 0 || memberFolders.length > 0;
                     return (
                       <div key={member._id} className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
                         <div className="flex items-center justify-between">
@@ -674,7 +712,7 @@ export default function DashboardPage() {
                             </span>
                             {member.name}&apos;s Items ({memberFolders.length + memberFiles.length})
                           </button>
-                          {memberFiles.length > 0 && (
+                          {hasItems && (
                             <label
                               className={cn(
                                 "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-zinc-800",
@@ -701,7 +739,7 @@ export default function DashboardPage() {
                               <input
                                 type="checkbox"
                                 checked={allSelected}
-                                onChange={() => toggleSelectAll(fileIds)}
+                                onChange={() => toggleSelectAll(fileIds, folderIds)}
                                 className="sr-only"
                               />
                               Select all
@@ -725,8 +763,10 @@ export default function DashboardPage() {
                   if (unassignedFolders.length === 0 && unassignedFiles.length === 0) return null;
                   const isExpanded = isSectionExpanded("unassigned");
                   const fileIds = unassignedFiles.map((f) => f._id);
-                  const allSelected = areAllSelected(fileIds);
-                  const someSelected = areSomeSelected(fileIds);
+                  const folderIds = unassignedFolders.map((f) => f._id);
+                  const allSelected = areAllSelected(fileIds, folderIds);
+                  const someSelected = areSomeSelected(fileIds, folderIds);
+                  const hasItems = unassignedFiles.length > 0 || unassignedFolders.length > 0;
                   return (
                     <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
                       <div className="flex items-center justify-between">
@@ -742,7 +782,7 @@ export default function DashboardPage() {
                           />
                           Family Items ({unassignedFolders.length + unassignedFiles.length})
                         </button>
-                        {unassignedFiles.length > 0 && (
+                        {hasItems && (
                           <label
                             className={cn(
                               "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-zinc-800",
@@ -769,7 +809,7 @@ export default function DashboardPage() {
                             <input
                               type="checkbox"
                               checked={allSelected}
-                              onChange={() => toggleSelectAll(fileIds)}
+                              onChange={() => toggleSelectAll(fileIds, folderIds)}
                               className="sr-only"
                             />
                             Select all
@@ -1026,7 +1066,8 @@ export default function DashboardPage() {
       {/* Bulk action bar */}
       {isOwner && (
         <BulkActionBar
-          selectedIds={selectedFiles}
+          selectedFileIds={selectedFiles}
+          selectedFolderIds={selectedFolders}
           onClearSelection={clearSelection}
           familyMembers={members}
         />

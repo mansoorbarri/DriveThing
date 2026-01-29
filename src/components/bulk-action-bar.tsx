@@ -26,13 +26,15 @@ interface FamilyMember {
 }
 
 interface BulkActionBarProps {
-  selectedIds: Set<Id<"files">>;
+  selectedFileIds: Set<Id<"files">>;
+  selectedFolderIds: Set<Id<"folders">>;
   onClearSelection: () => void;
   familyMembers: FamilyMember[];
 }
 
 export function BulkActionBar({
-  selectedIds,
+  selectedFileIds,
+  selectedFolderIds,
   onClearSelection,
   familyMembers,
 }: BulkActionBarProps) {
@@ -46,30 +48,56 @@ export function BulkActionBar({
   const bulkDeleteFiles = useMutation(api.files.bulkDeleteFiles);
   const bulkMoveFiles = useMutation(api.files.bulkMoveFiles);
   const bulkAssignFiles = useMutation(api.files.bulkAssignFiles);
+  const bulkDeleteFolders = useMutation(api.folders.bulkDeleteFolders);
+  const bulkMoveFolders = useMutation(api.folders.bulkMoveFolders);
+  const bulkAssignFolders = useMutation(api.folders.bulkAssignFolders);
 
   const allFolders = useQuery(
     api.folders.getAllFoldersForPicker,
     user ? { clerkId: user.id } : "skip"
   );
 
-  const count = selectedIds.size;
+  const fileCount = selectedFileIds.size;
+  const folderCount = selectedFolderIds.size;
+  const totalCount = fileCount + folderCount;
 
   const handleBulkDelete = async () => {
     if (!user) return;
     setIsDeleting(true);
     try {
-      const result = await bulkDeleteFiles({
-        fileIds: Array.from(selectedIds),
-        clerkId: user.id,
-      });
-
-      // Delete from UploadThing storage
-      if (result?.fileKeys && result.fileKeys.length > 0) {
-        await fetch("/api/uploadthing/delete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fileKeys: result.fileKeys }),
+      // Delete files
+      if (fileCount > 0) {
+        const result = await bulkDeleteFiles({
+          fileIds: Array.from(selectedFileIds),
+          clerkId: user.id,
         });
+
+        // Delete from UploadThing storage
+        if (result?.fileKeys && result.fileKeys.length > 0) {
+          await fetch("/api/uploadthing/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fileKeys: result.fileKeys }),
+          });
+        }
+      }
+
+      // Delete folders
+      if (folderCount > 0) {
+        const result = await bulkDeleteFolders({
+          folderIds: Array.from(selectedFolderIds),
+          deleteContents: true,
+          clerkId: user.id,
+        });
+
+        // Delete files inside folders from UploadThing storage
+        if (result?.fileKeysToDelete && result.fileKeysToDelete.length > 0) {
+          await fetch("/api/uploadthing/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fileKeys: result.fileKeysToDelete }),
+          });
+        }
       }
 
       onClearSelection();
@@ -81,11 +109,22 @@ export function BulkActionBar({
 
   const handleBulkMove = async (folderId?: Id<"folders">) => {
     if (!user) return;
-    await bulkMoveFiles({
-      fileIds: Array.from(selectedIds),
-      folderId,
-      clerkId: user.id,
-    });
+    // Move files
+    if (fileCount > 0) {
+      await bulkMoveFiles({
+        fileIds: Array.from(selectedFileIds),
+        folderId,
+        clerkId: user.id,
+      });
+    }
+    // Move folders
+    if (folderCount > 0) {
+      await bulkMoveFolders({
+        folderIds: Array.from(selectedFolderIds),
+        newParentFolderId: folderId,
+        clerkId: user.id,
+      });
+    }
     onClearSelection();
     setShowMoveModal(false);
   };
@@ -94,11 +133,22 @@ export function BulkActionBar({
     if (!user) return;
     setIsAssigning(true);
     try {
-      await bulkAssignFiles({
-        fileIds: Array.from(selectedIds),
-        assignedTo,
-        clerkId: user.id,
-      });
+      // Assign files
+      if (fileCount > 0) {
+        await bulkAssignFiles({
+          fileIds: Array.from(selectedFileIds),
+          assignedTo,
+          clerkId: user.id,
+        });
+      }
+      // Assign folders
+      if (folderCount > 0) {
+        await bulkAssignFolders({
+          folderIds: Array.from(selectedFolderIds),
+          assignedTo,
+          clerkId: user.id,
+        });
+      }
       onClearSelection();
       setShowAssignModal(false);
     } finally {
@@ -106,7 +156,29 @@ export function BulkActionBar({
     }
   };
 
-  if (count === 0) return null;
+  if (totalCount === 0) return null;
+
+  // Build selection text
+  const getSelectionText = () => {
+    const parts = [];
+    if (fileCount > 0) {
+      parts.push(`${fileCount} ${fileCount === 1 ? "file" : "files"}`);
+    }
+    if (folderCount > 0) {
+      parts.push(`${folderCount} ${folderCount === 1 ? "folder" : "folders"}`);
+    }
+    return parts.join(" and ");
+  };
+
+  const getItemText = () => {
+    if (fileCount > 0 && folderCount > 0) {
+      return `${totalCount} items`;
+    }
+    if (folderCount > 0) {
+      return `${folderCount} ${folderCount === 1 ? "folder" : "folders"}`;
+    }
+    return `${fileCount} ${fileCount === 1 ? "file" : "files"}`;
+  };
 
   return (
     <>
@@ -122,7 +194,7 @@ export function BulkActionBar({
               <CloseIcon className="h-5 w-5" />
             </button>
             <span className="text-sm font-medium text-zinc-200">
-              {count} {count === 1 ? "file" : "files"} selected
+              {getSelectionText()} selected
             </span>
           </div>
 
@@ -162,11 +234,11 @@ export function BulkActionBar({
       <Modal
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
-        title={`Delete ${count} ${count === 1 ? "file" : "files"}?`}
+        title={`Delete ${getItemText()}?`}
       >
         <p className="mb-6 text-zinc-400">
-          Are you sure you want to delete {count}{" "}
-          {count === 1 ? "file" : "files"}? This cannot be undone.
+          Are you sure you want to delete {getSelectionText()}? This cannot be undone.
+          {folderCount > 0 && " All contents inside the selected folders will also be deleted."}
         </p>
         <div className="flex gap-3">
           <Button
@@ -182,7 +254,7 @@ export function BulkActionBar({
             loading={isDeleting}
             className="flex-1"
           >
-            Delete {count} {count === 1 ? "file" : "files"}
+            Delete {getItemText()}
           </Button>
         </div>
       </Modal>
@@ -192,7 +264,7 @@ export function BulkActionBar({
         <BulkMoveModal
           isOpen={showMoveModal}
           onClose={() => setShowMoveModal(false)}
-          count={count}
+          itemText={getItemText()}
           onMove={handleBulkMove}
         />
       )}
@@ -201,10 +273,10 @@ export function BulkActionBar({
       <Modal
         isOpen={showAssignModal}
         onClose={() => setShowAssignModal(false)}
-        title={`Assign ${count} ${count === 1 ? "file" : "files"}`}
+        title={`Assign ${getItemText()}`}
       >
         <p className="mb-4 text-sm text-zinc-400">
-          Choose who these files should be assigned to.
+          Choose who {totalCount === 1 ? "this" : "these"} {fileCount > 0 && folderCount > 0 ? "items" : fileCount > 0 ? (fileCount === 1 ? "file" : "files") : (folderCount === 1 ? "folder" : "folders")} should be assigned to.
         </p>
         <div className="max-h-64 space-y-2 overflow-y-auto">
           <button
@@ -252,12 +324,12 @@ export function BulkActionBar({
 function BulkMoveModal({
   isOpen,
   onClose,
-  count,
+  itemText,
   onMove,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  count: number;
+  itemText: string;
   onMove: (folderId?: Id<"folders">) => Promise<void>;
 }) {
   const { user } = useUser();
@@ -312,7 +384,7 @@ function BulkMoveModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Move ${count} files`}>
+    <Modal isOpen={isOpen} onClose={onClose} title={`Move ${itemText}`}>
       <p className="mb-4 text-sm text-zinc-400">
         Select a destination folder.
       </p>
@@ -408,7 +480,7 @@ function BulkMoveModal({
           Cancel
         </Button>
         <Button onClick={handleMove} loading={isMoving} className="flex-1">
-          Move {count} {count === 1 ? "file" : "files"}
+          Move {itemText}
         </Button>
       </div>
     </Modal>
