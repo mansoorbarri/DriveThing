@@ -638,7 +638,7 @@ export function FileUploader({
           <p className="text-sm font-medium text-zinc-300">
             Name your files and assign to family members
           </p>
-          <div className="max-h-[400px] space-y-4 overflow-y-auto pr-1">
+          <div className="max-h-[50vh] space-y-4 overflow-y-auto pr-1">
           {pendingFiles.map((pending, index) => (
             <div
               key={index}
@@ -825,7 +825,7 @@ export function FileUploader({
 
       {/* Upload progress */}
       {uploadingFiles.length > 0 && (
-        <div className="space-y-2">
+        <div className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">
           {uploadingFiles.map((f, i) => (
             <div
               key={i}
