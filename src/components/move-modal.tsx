@@ -7,8 +7,14 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Modal } from "./ui/modal";
 import { Button } from "./ui/button";
-import { FolderIcon, HomeIcon, ChevronRightIcon } from "./icons";
+import { FolderIcon, HomeIcon, ChevronRightIcon, FamilyIcon } from "./icons";
 import { cn } from "~/lib/utils";
+
+interface FamilyMember {
+  _id: Id<"users">;
+  name: string;
+  role?: "owner" | "member";
+}
 
 interface MoveModalProps {
   isOpen: boolean;
@@ -23,7 +29,15 @@ interface FolderNode {
   _id: Id<"folders">;
   name: string;
   parentFolderId?: Id<"folders">;
+  assignedTo?: Id<"users">;
   children: FolderNode[];
+}
+
+interface GroupedFolders {
+  memberId: string;
+  memberName: string;
+  isOwner: boolean;
+  folders: FolderNode[];
 }
 
 export function MoveModal({
@@ -40,28 +54,27 @@ export function MoveModal({
   );
   const [isMoving, setIsMoving] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  // Initialize all groups as expanded
+  const [expandedGroups, setExpandedGroups] = useState<Set<string> | null>(null);
 
   const allFolders = useQuery(
     api.folders.getAllFoldersForPicker,
     user ? { clerkId: user.id } : "skip"
   );
 
+  const userWithFamily = useQuery(
+    api.users.getUserWithFamily,
+    user ? { clerkId: user.id } : "skip"
+  );
+
   const moveFile = useMutation(api.files.moveFile);
   const moveFolder = useMutation(api.folders.moveFolder);
 
-  // Build folder tree
-  const folderTree = useMemo(() => {
-    if (!allFolders) return [];
+  const members = userWithFamily?.members ?? [];
 
-    const folderMap = new Map<string | undefined, FolderNode[]>();
-
-    // Initialize the map
-    allFolders.forEach((folder) => {
-      const parentKey = folder.parentFolderId ?? "root";
-      if (!folderMap.has(parentKey)) {
-        folderMap.set(parentKey, []);
-      }
-    });
+  // Build folder tree grouped by assignee
+  const groupedFolderTree = useMemo(() => {
+    if (!allFolders || !members.length) return [];
 
     // Create nodes
     const nodeMap = new Map<string, FolderNode>();
@@ -72,7 +85,7 @@ export function MoveModal({
       });
     });
 
-    // Build tree
+    // Build tree - connect children to parents
     const rootNodes: FolderNode[] = [];
     allFolders.forEach((folder) => {
       const node = nodeMap.get(folder._id)!;
@@ -95,8 +108,58 @@ export function MoveModal({
     };
     sortChildren(rootNodes);
 
-    return rootNodes;
-  }, [allFolders]);
+    // Group root folders by assignee
+    const groups: GroupedFolders[] = [];
+
+    // Owner's folders first
+    const ownerMember = members.find((m) => m.role === "owner");
+    if (ownerMember) {
+      const ownerFolders = rootNodes.filter((f) => f.assignedTo === ownerMember._id);
+      if (ownerFolders.length > 0) {
+        groups.push({
+          memberId: ownerMember._id,
+          memberName: ownerMember.name,
+          isOwner: true,
+          folders: ownerFolders,
+        });
+      }
+    }
+
+    // Other members' folders
+    members
+      .filter((m) => m.role !== "owner")
+      .forEach((member) => {
+        const memberFolders = rootNodes.filter((f) => f.assignedTo === member._id);
+        if (memberFolders.length > 0) {
+          groups.push({
+            memberId: member._id,
+            memberName: member.name,
+            isOwner: false,
+            folders: memberFolders,
+          });
+        }
+      });
+
+    // Unassigned/Family folders
+    const unassignedFolders = rootNodes.filter((f) => !f.assignedTo);
+    if (unassignedFolders.length > 0) {
+      groups.push({
+        memberId: "unassigned",
+        memberName: "Family Folders",
+        isOwner: false,
+        folders: unassignedFolders,
+      });
+    }
+
+    return groups;
+  }, [allFolders, members]);
+
+  // Auto-expand all groups when data loads
+  const effectiveExpandedGroups = useMemo(() => {
+    if (expandedGroups !== null) return expandedGroups;
+    // Default: expand all groups
+    return new Set(groupedFolderTree.map((g) => g.memberId));
+  }, [expandedGroups, groupedFolderTree]);
 
   const handleMove = async () => {
     if (!user) return;
@@ -138,6 +201,17 @@ export function MoveModal({
       }
       return next;
     });
+  };
+
+  const toggleGroup = (groupId: string) => {
+    const current = effectiveExpandedGroups;
+    const next = new Set(current);
+    if (next.has(groupId)) {
+      next.delete(groupId);
+    } else {
+      next.add(groupId);
+    }
+    setExpandedGroups(next);
   };
 
   // Check if a folder is a descendant of the item being moved (for folders only)
@@ -229,8 +303,53 @@ export function MoveModal({
           )}
         </div>
 
-        {/* Folder tree */}
-        {folderTree.map((node) => renderFolderNode(node))}
+        {/* Grouped folder tree */}
+        {groupedFolderTree.map((group) => {
+          const isGroupExpanded = effectiveExpandedGroups.has(group.memberId);
+          return (
+            <div key={group.memberId} className="border-b border-zinc-700/50 last:border-b-0">
+              <button
+                onClick={() => toggleGroup(group.memberId)}
+                className={cn(
+                  "flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-zinc-800/50",
+                  group.isOwner ? "text-violet-400" : "text-zinc-400"
+                )}
+              >
+                <ChevronRightIcon
+                  className={cn(
+                    "h-4 w-4 transition-transform",
+                    isGroupExpanded && "rotate-90"
+                  )}
+                />
+                {group.memberId === "unassigned" ? (
+                  <FamilyIcon className="h-4 w-4" />
+                ) : (
+                  <span
+                    className={cn(
+                      "flex h-5 w-5 items-center justify-center rounded-full text-xs",
+                      group.isOwner ? "bg-violet-500/20" : "bg-zinc-700"
+                    )}
+                  >
+                    {group.memberName[0]?.toUpperCase()}
+                  </span>
+                )}
+                <span>
+                  {group.memberId === "unassigned"
+                    ? "Family Folders"
+                    : `${group.memberName}'s Folders`}
+                </span>
+                <span className="ml-auto text-xs text-zinc-500">
+                  ({group.folders.length})
+                </span>
+              </button>
+              {isGroupExpanded && (
+                <div className="pb-1">
+                  {group.folders.map((node) => renderFolderNode(node, 0))}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {(!allFolders || allFolders.length === 0) && (
           <p className="p-4 text-center text-sm text-zinc-500">
