@@ -44,6 +44,15 @@ interface PendingFile {
   assignedTo?: Id<"users">;
   folderId?: Id<"folders">;
   tags: string[];
+  // For folder uploads - the relative path within the dropped folder
+  relativePath?: string;
+}
+
+// Structure to track folders that need to be created
+interface FolderToCreate {
+  name: string;
+  relativePath: string; // Full path from root of dropped folder
+  parentPath?: string; // Parent folder's relative path
 }
 
 interface UploadingFile {
@@ -79,6 +88,101 @@ function getExtension(filename: string): string {
   return lastDot !== -1 ? filename.slice(lastDot) : "";
 }
 
+// Accepted file types for filtering
+const ACCEPTED_EXTENSIONS = [".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".xls", ".xlsx", ".doc", ".docx"];
+
+function isAcceptedFile(filename: string): boolean {
+  const ext = getExtension(filename).toLowerCase();
+  return ACCEPTED_EXTENSIONS.includes(ext);
+}
+
+// Read a FileSystemEntry recursively to get all files with their paths
+async function readEntryRecursively(
+  entry: FileSystemEntry,
+  path: string = ""
+): Promise<{ files: { file: File; relativePath: string }[]; folders: FolderToCreate[] }> {
+  const files: { file: File; relativePath: string }[] = [];
+  const folders: FolderToCreate[] = [];
+
+  if (entry.isFile) {
+    const fileEntry = entry as FileSystemFileEntry;
+    const file = await new Promise<File>((resolve, reject) => {
+      fileEntry.file(resolve, reject);
+    });
+    if (isAcceptedFile(file.name)) {
+      files.push({ file, relativePath: path });
+    }
+  } else if (entry.isDirectory) {
+    const dirEntry = entry as FileSystemDirectoryEntry;
+    const currentPath = path ? `${path}/${entry.name}` : entry.name;
+
+    // Add this folder to the list
+    folders.push({
+      name: entry.name,
+      relativePath: currentPath,
+      parentPath: path || undefined,
+    });
+
+    // Read directory contents
+    const reader = dirEntry.createReader();
+    const entries = await new Promise<FileSystemEntry[]>((resolve, reject) => {
+      const allEntries: FileSystemEntry[] = [];
+      const readBatch = () => {
+        reader.readEntries((batch) => {
+          if (batch.length === 0) {
+            resolve(allEntries);
+          } else {
+            allEntries.push(...batch);
+            readBatch(); // Continue reading if there are more entries
+          }
+        }, reject);
+      };
+      readBatch();
+    });
+
+    // Recursively process all entries
+    for (const childEntry of entries) {
+      const result = await readEntryRecursively(childEntry, currentPath);
+      files.push(...result.files);
+      folders.push(...result.folders);
+    }
+  }
+
+  return { files, folders };
+}
+
+// Get folder entries from a DataTransfer
+async function getFolderStructure(
+  dataTransfer: DataTransfer
+): Promise<{ files: { file: File; relativePath: string }[]; folders: FolderToCreate[] } | null> {
+  const items = dataTransfer.items;
+  if (!items || items.length === 0) return null;
+
+  const allFiles: { file: File; relativePath: string }[] = [];
+  const allFolders: FolderToCreate[] = [];
+  let hasFolder = false;
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    // @ts-expect-error - webkitGetAsEntry is not in the types
+    const entry = item.webkitGetAsEntry?.() as FileSystemEntry | null;
+
+    if (entry) {
+      if (entry.isDirectory) {
+        hasFolder = true;
+      }
+      const result = await readEntryRecursively(entry, "");
+      allFiles.push(...result.files);
+      allFolders.push(...result.folders);
+    }
+  }
+
+  // Only return folder structure if there was actually a folder dropped
+  if (!hasFolder) return null;
+
+  return { files: allFiles, folders: allFolders };
+}
+
 // Compress image to under 1MB
 async function compressImage(file: File): Promise<File> {
   const options = {
@@ -110,7 +214,11 @@ export function FileUploader({
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [tagInput, setTagInput] = useState<Record<number, string>>({});
+  // Folders that need to be created (from folder drop)
+  const [foldersToCreate, setFoldersToCreate] = useState<FolderToCreate[]>([]);
+  const [creatingFolders, setCreatingFolders] = useState(false);
   const createFile = useMutation(api.files.createFile);
+  const createFolder = useMutation(api.folders.createFolder);
 
   // Use ref to store metadata to avoid closure issues in callbacks
   const uploadMetadataRef = useRef<Map<string, UploadMetadata>>(new Map());
@@ -194,6 +302,7 @@ export function FileUploader({
     },
   });
 
+  // Handle regular file drop (no folder structure)
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       if (acceptedFiles.length === 0) return;
@@ -212,6 +321,37 @@ export function FileUploader({
       setPendingFiles((prev) => [...prev, ...newPendingFiles]);
     },
     [currentFolderId, currentFolderAssignee]
+  );
+
+  // Handle folder drop with structure preservation
+  const handleFolderDrop = useCallback(
+    async (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (isUploading || isProcessing) return;
+
+      const result = await getFolderStructure(e.dataTransfer);
+
+      if (result && result.files.length > 0) {
+        // Store folders to create
+        setFoldersToCreate(result.folders);
+
+        // Add files with their relative paths
+        const newPendingFiles = result.files.map(({ file, relativePath }) => ({
+          file,
+          customName: file.name.replace(/\.[^/.]+$/, ""), // Remove extension for display
+          originalName: file.name,
+          assignedTo: currentFolderAssignee,
+          folderId: currentFolderId,
+          tags: [],
+          relativePath, // Track the folder path for this file
+        }));
+
+        setPendingFiles((prev) => [...prev, ...newPendingFiles]);
+      }
+    },
+    [currentFolderId, currentFolderAssignee, isUploading, isProcessing]
   );
 
   const updateFileName = (index: number, newName: string) => {
@@ -288,6 +428,46 @@ export function FileUploader({
     // Clear previous metadata
     uploadMetadataRef.current.clear();
 
+    // Map from relative path to folder ID
+    const folderPathToId = new Map<string, Id<"folders">>();
+
+    // Create folders first if we have folder structure from a drag-drop
+    if (foldersToCreate.length > 0 && user) {
+      setCreatingFolders(true);
+
+      // Sort folders by depth (parents first) to create in correct order
+      const sortedFolders = [...foldersToCreate].sort((a, b) => {
+        const depthA = (a.relativePath.match(/\//g) || []).length;
+        const depthB = (b.relativePath.match(/\//g) || []).length;
+        return depthA - depthB;
+      });
+
+      for (const folder of sortedFolders) {
+        // Determine parent folder ID
+        let parentId: Id<"folders"> | undefined = currentFolderId;
+        if (folder.parentPath) {
+          // If this folder has a parent from the dropped structure, use that
+          parentId = folderPathToId.get(folder.parentPath) ?? currentFolderId;
+        }
+
+        // Create the folder - all folders inherit assignee from the parent (currentFolderAssignee)
+        // This creates infinite inheritance: folder within folder within folder all get same assignee
+        try {
+          const newFolderId = await createFolder({
+            name: folder.name,
+            parentFolderId: parentId,
+            assignedTo: currentFolderAssignee, // Inherit from parent
+            clerkId: user.id,
+          });
+          folderPathToId.set(folder.relativePath, newFolderId);
+        } catch (err) {
+          console.error("Failed to create folder:", folder.name, err);
+        }
+      }
+
+      setCreatingFolders(false);
+    }
+
     // Process and compress files
     const processedFiles: UploadingFile[] = [];
     const filesToUpload: File[] = [];
@@ -296,11 +476,22 @@ export function FileUploader({
       const extension = getExtension(pending.originalName);
       const formattedName = formatFileName(pending.customName, extension);
 
+      // Determine the folder ID for this file
+      let targetFolderId = pending.folderId;
+      if (pending.relativePath) {
+        // File came from a folder drop - get the folder for its path
+        // relativePath is the folder containing this file (e.g., "MyFolder/SubFolder")
+        const folderPath = pending.relativePath;
+        if (folderPath) {
+          targetFolderId = folderPathToId.get(folderPath) ?? currentFolderId;
+        }
+      }
+
       // Store metadata in ref for later use in callback
       uploadMetadataRef.current.set(formattedName, {
         originalName: pending.originalName,
         assignedTo: pending.assignedTo,
-        folderId: pending.folderId,
+        folderId: targetFolderId,
         tags: pending.tags,
       });
 
@@ -337,6 +528,7 @@ export function FileUploader({
 
     setUploadingFiles(processedFiles);
     setPendingFiles([]);
+    setFoldersToCreate([]); // Clear folders to create
 
     // Update all to uploading status
     setUploadingFiles((prev) =>
@@ -365,21 +557,49 @@ export function FileUploader({
     },
     maxSize: 64 * 1024 * 1024, // 64MB (will be compressed if image)
     disabled: isUploading || isProcessing,
+    // Disable react-dropzone's built-in drop handling so we can intercept folders
+    noClick: false,
+    noKeyboard: false,
+    noDrag: false, // We still want drag detection for visual feedback
   });
+
+  // Custom drop handler that checks for folders first
+  const handleDrop = useCallback(
+    async (e: React.DragEvent<HTMLDivElement>) => {
+      // Check if this is a folder drop
+      const items = e.dataTransfer?.items;
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          // @ts-expect-error - webkitGetAsEntry is not in the types
+          const entry = items[i].webkitGetAsEntry?.() as FileSystemEntry | null;
+          if (entry?.isDirectory) {
+            // It's a folder drop - use our custom handler
+            await handleFolderDrop(e);
+            return;
+          }
+        }
+      }
+      // Not a folder drop - let react-dropzone handle it via onDrop
+    },
+    [handleFolderDrop]
+  );
 
   const hasUploading = uploadingFiles.some(
     (f) =>
       f.status === "uploading" ||
       f.status === "compressing" ||
       f.status === "saving"
-  );
+  ) || creatingFolders;
 
   return (
     <div className="space-y-4">
       {/* Dropzone - only show if no pending files */}
       {pendingFiles.length === 0 && uploadingFiles.length === 0 && (
         <div
-          {...getRootProps()}
+          {...getRootProps({
+            onDrop: handleDrop,
+            onDragOver: (e) => e.preventDefault(),
+          })}
           className={cn(
             "cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors",
             isDragActive
@@ -391,11 +611,11 @@ export function FileUploader({
           <input {...getInputProps()} />
           <UploadIcon className="mx-auto h-10 w-10 text-zinc-500" />
           <p className="mt-3 text-base font-medium text-zinc-200">
-            {isDragActive ? "Drop files here" : "Drag and drop files here"}
+            {isDragActive ? "Drop files or folders here" : "Drag and drop files or folders"}
           </p>
           <p className="mt-1 text-sm text-zinc-500">or tap to select files</p>
           <p className="mt-3 text-xs text-zinc-600">
-            PDF, images, Word, and Excel files. Images over 1MB will be compressed.
+            PDF, images, Word, and Excel files. Folders will preserve their structure.
           </p>
         </div>
       )}
@@ -403,6 +623,18 @@ export function FileUploader({
       {/* Pending files - name entry */}
       {pendingFiles.length > 0 && (
         <div className="space-y-4">
+          {/* Folder structure notice */}
+          {foldersToCreate.length > 0 && (
+            <div className="rounded-lg border border-violet-500/30 bg-violet-500/10 p-3">
+              <p className="text-sm font-medium text-violet-300">
+                {foldersToCreate.length} folder{foldersToCreate.length > 1 ? "s" : ""} will be created
+              </p>
+              <p className="mt-1 text-xs text-violet-400/70">
+                Folder structure will be preserved. All folders will inherit the current folder&apos;s assignee.
+              </p>
+            </div>
+          )}
+
           <p className="text-sm font-medium text-zinc-300">
             Name your files and assign to family members
           </p>
@@ -413,9 +645,16 @@ export function FileUploader({
               className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4"
             >
               <div className="mb-3 flex items-center justify-between">
-                <span className="text-xs text-zinc-500">
-                  {pending.originalName} ({formatFileSize(pending.file.size)})
-                </span>
+                <div>
+                  <span className="text-xs text-zinc-500">
+                    {pending.originalName} ({formatFileSize(pending.file.size)})
+                  </span>
+                  {pending.relativePath && (
+                    <p className="text-xs text-violet-400/70">
+                      📁 {pending.relativePath}
+                    </p>
+                  )}
+                </div>
                 <button
                   onClick={() => removePendingFile(index)}
                   className="text-xs text-red-400 hover:text-red-300"
@@ -548,7 +787,10 @@ export function FileUploader({
           <div className="flex gap-3">
             <Button
               variant="secondary"
-              onClick={() => setPendingFiles([])}
+              onClick={() => {
+                setPendingFiles([]);
+                setFoldersToCreate([]);
+              }}
               className="flex-1"
             >
               Cancel
@@ -556,23 +798,27 @@ export function FileUploader({
             <Button
               onClick={handleUpload}
               disabled={
-                pendingFiles.some((f) => !f.customName.trim()) || isProcessing
+                pendingFiles.some((f) => !f.customName.trim()) || isProcessing || creatingFolders
               }
-              loading={isProcessing}
+              loading={isProcessing || creatingFolders}
               className="flex-1"
             >
-              Upload {pendingFiles.length} file
-              {pendingFiles.length > 1 ? "s" : ""}
+              {foldersToCreate.length > 0
+                ? `Upload ${pendingFiles.length} file${pendingFiles.length > 1 ? "s" : ""} with folders`
+                : `Upload ${pendingFiles.length} file${pendingFiles.length > 1 ? "s" : ""}`}
             </Button>
           </div>
 
           {/* Add more files */}
           <div
-            {...getRootProps()}
+            {...getRootProps({
+              onDrop: handleDrop,
+              onDragOver: (e) => e.preventDefault(),
+            })}
             className="cursor-pointer rounded-lg border border-dashed border-zinc-700 p-3 text-center text-sm text-zinc-500 hover:bg-zinc-800/50"
           >
             <input {...getInputProps()} />
-            + Add more files
+            + Add more files or folders
           </div>
         </div>
       )}
@@ -620,8 +866,15 @@ export function FileUploader({
         </div>
       )}
 
+      {/* Creating folders indicator */}
+      {creatingFolders && (
+        <div className="rounded-lg bg-zinc-800/50 p-3 text-center">
+          <p className="text-sm text-zinc-400">Creating folder structure...</p>
+        </div>
+      )}
+
       {/* Uploading indicator */}
-      {hasUploading && (
+      {hasUploading && !creatingFolders && (
         <p className="text-center text-sm text-zinc-500">
           Please wait while your files are being uploaded...
         </p>
