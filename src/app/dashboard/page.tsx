@@ -998,6 +998,7 @@ export default function DashboardPage() {
         isOpen={showCreateFolder}
         onClose={() => setShowCreateFolder(false)}
         parentFolderId={currentFolderId}
+        parentFolderAssignee={currentFolderAssignee}
         familyMembers={members}
       />
 

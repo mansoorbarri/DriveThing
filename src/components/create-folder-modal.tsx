@@ -20,6 +20,7 @@ interface CreateFolderModalProps {
   isOpen: boolean;
   onClose: () => void;
   parentFolderId?: Id<"folders">;
+  parentFolderAssignee?: Id<"users">;
   familyMembers: FamilyMember[];
 }
 
@@ -27,12 +28,21 @@ export function CreateFolderModal({
   isOpen,
   onClose,
   parentFolderId,
+  parentFolderAssignee,
   familyMembers,
 }: CreateFolderModalProps) {
   const { user } = useUser();
   const [name, setName] = useState("");
-  const [assignedTo, setAssignedTo] = useState<Id<"users"> | undefined>();
+  // Initialize with parent folder's assignee if creating a subfolder
+  const [assignedTo, setAssignedTo] = useState<Id<"users"> | undefined>(parentFolderAssignee);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Update assignedTo when parentFolderAssignee changes (e.g., navigating to different folder)
+  const [lastParentAssignee, setLastParentAssignee] = useState(parentFolderAssignee);
+  if (parentFolderAssignee !== lastParentAssignee) {
+    setLastParentAssignee(parentFolderAssignee);
+    setAssignedTo(parentFolderAssignee);
+  }
 
   const createFolder = useMutation(api.folders.createFolder);
 
