@@ -614,3 +614,93 @@ export const moveFile = mutation({
     await ctx.db.patch(args.fileId, { folderId: args.folderId });
   },
 });
+
+// Bulk delete files - OWNER ONLY
+export const bulkDeleteFiles = mutation({
+  args: {
+    fileIds: v.array(v.id("files")),
+    clerkId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+
+    if (!user || user.role !== "owner") {
+      throw new Error("Only owners can delete files");
+    }
+
+    const fileKeys: string[] = [];
+
+    for (const fileId of args.fileIds) {
+      const file = await ctx.db.get(fileId);
+      if (file && file.uploadedBy === user._id) {
+        fileKeys.push(file.fileKey);
+        await ctx.db.delete(fileId);
+      }
+    }
+
+    return { fileKeys };
+  },
+});
+
+// Bulk move files to folder - OWNER ONLY
+export const bulkMoveFiles = mutation({
+  args: {
+    fileIds: v.array(v.id("files")),
+    folderId: v.optional(v.id("folders")),
+    clerkId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+
+    if (!user || user.role !== "owner") {
+      throw new Error("Only owners can move files");
+    }
+
+    // Validate target folder if provided
+    if (args.folderId) {
+      const folder = await ctx.db.get(args.folderId);
+      if (!folder || folder.familyId !== user.familyId) {
+        throw new Error("Target folder not found");
+      }
+    }
+
+    for (const fileId of args.fileIds) {
+      const file = await ctx.db.get(fileId);
+      if (file && file.uploadedBy === user._id) {
+        await ctx.db.patch(fileId, { folderId: args.folderId });
+      }
+    }
+  },
+});
+
+// Bulk assign files to member - OWNER ONLY
+export const bulkAssignFiles = mutation({
+  args: {
+    fileIds: v.array(v.id("files")),
+    assignedTo: v.optional(v.id("users")),
+    clerkId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+
+    if (!user || user.role !== "owner") {
+      throw new Error("Only owners can assign files");
+    }
+
+    for (const fileId of args.fileIds) {
+      const file = await ctx.db.get(fileId);
+      if (file && file.uploadedBy === user._id) {
+        await ctx.db.patch(fileId, { assignedTo: args.assignedTo });
+      }
+    }
+  },
+});

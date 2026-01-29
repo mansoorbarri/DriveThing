@@ -14,6 +14,7 @@ import { FamilySettings } from "~/components/family-settings";
 import { CreateFolderModal } from "~/components/create-folder-modal";
 import { FolderBreadcrumb } from "~/components/folder-breadcrumb";
 import { MoveModal } from "~/components/move-modal";
+import { BulkActionBar } from "~/components/bulk-action-bar";
 import { EmptyState } from "~/components/ui/empty-state";
 import { Modal } from "~/components/ui/modal";
 import {
@@ -44,6 +45,8 @@ export default function DashboardPage() {
   const [moveTarget, setMoveTarget] = useState<MoveTarget | null>(null);
   // Track sections that user has manually toggled (stores the toggled state)
   const [toggledSections, setToggledSections] = useState<Map<string, boolean>>(new Map());
+  // Track selected files for bulk actions
+  const [selectedFiles, setSelectedFiles] = useState<Set<Id<"files">>>(new Set());
 
   // Sync user with Convex
   const getOrCreateUser = useMutation(api.users.getOrCreateUser);
@@ -276,6 +279,7 @@ export default function DashboardPage() {
   const navigateToFolder = (folderId?: Id<"folders">) => {
     setCurrentFolderId(folderId);
     setSearchQuery("");
+    setSelectedFiles(new Set()); // Clear selection when navigating
   };
 
   // Loading state
@@ -320,6 +324,67 @@ export default function DashboardPage() {
     });
   };
 
+  // Toggle file selection
+  const toggleFileSelection = (fileId: Id<"files">) => {
+    setSelectedFiles((prev) => {
+      const next = new Set(prev);
+      if (next.has(fileId)) {
+        next.delete(fileId);
+      } else {
+        next.add(fileId);
+      }
+      return next;
+    });
+  };
+
+  // Clear all selections
+  const clearSelection = () => {
+    setSelectedFiles(new Set());
+  };
+
+  // Select all files in a group
+  const selectAllInGroup = (fileIds: Id<"files">[]) => {
+    setSelectedFiles((prev) => {
+      const next = new Set(prev);
+      fileIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  // Deselect all files in a group
+  const deselectAllInGroup = (fileIds: Id<"files">[]) => {
+    setSelectedFiles((prev) => {
+      const next = new Set(prev);
+      fileIds.forEach((id) => next.delete(id));
+      return next;
+    });
+  };
+
+  // Check if all files in a group are selected
+  const areAllSelected = (fileIds: Id<"files">[]) => {
+    if (fileIds.length === 0) return false;
+    return fileIds.every((id) => selectedFiles.has(id));
+  };
+
+  // Check if some (but not all) files in a group are selected
+  const areSomeSelected = (fileIds: Id<"files">[]) => {
+    if (fileIds.length === 0) return false;
+    const selectedCount = fileIds.filter((id) => selectedFiles.has(id)).length;
+    return selectedCount > 0 && selectedCount < fileIds.length;
+  };
+
+  // Toggle select all for a group
+  const toggleSelectAll = (fileIds: Id<"files">[]) => {
+    if (areAllSelected(fileIds)) {
+      deselectAllInGroup(fileIds);
+    } else {
+      selectAllInGroup(fileIds);
+    }
+  };
+
+  // Check if we're in selection mode
+  const selectionMode = selectedFiles.size > 0;
+
   // Render file card with move handler
   const renderFileCard = (file: (typeof filteredMyFiles)[0]) => (
     <FileCard
@@ -350,6 +415,9 @@ export default function DashboardPage() {
               })
           : undefined
       }
+      selectionMode={selectionMode}
+      isSelected={selectedFiles.has(file._id)}
+      onToggleSelect={toggleFileSelection}
     />
   );
 
@@ -398,6 +466,7 @@ export default function DashboardPage() {
             onClick={() => {
               setActiveTab("my-files");
               setCurrentFolderId(undefined);
+              setSelectedFiles(new Set());
             }}
             className={cn(
               "flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors",
@@ -415,6 +484,7 @@ export default function DashboardPage() {
             onClick={() => {
               setActiveTab("shared");
               setCurrentFolderId(undefined);
+              setSelectedFiles(new Set());
             }}
             className={cn(
               "flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors",
@@ -519,23 +589,61 @@ export default function DashboardPage() {
                   const ownerFiles = groupedFiles[ownerMember?._id ?? ""] ?? [];
                   if (ownerFolders.length === 0 && ownerFiles.length === 0) return null;
                   const isExpanded = isSectionExpanded(ownerMember._id);
+                  const fileIds = ownerFiles.map((f) => f._id);
+                  const allSelected = areAllSelected(fileIds);
+                  const someSelected = areSomeSelected(fileIds);
                   return (
                     <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-4">
-                      <button
-                        onClick={() => toggleSection(ownerMember._id)}
-                        className="mb-0 flex w-full items-center gap-2 text-left text-sm font-medium text-violet-400 hover:text-violet-300"
-                      >
-                        <ChevronRightIcon
-                          className={cn(
-                            "h-4 w-4 transition-transform",
-                            isExpanded && "rotate-90"
-                          )}
-                        />
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-500/20 text-xs">
-                          {ownerMember?.name[0]?.toUpperCase()}
-                        </span>
-                        {ownerMember?.name}&apos;s Items ({ownerFolders.length + ownerFiles.length})
-                      </button>
+                      <div className="flex items-center justify-between">
+                        <button
+                          onClick={() => toggleSection(ownerMember._id)}
+                          className="flex items-center gap-2 text-left text-sm font-medium text-violet-400 hover:text-violet-300"
+                        >
+                          <ChevronRightIcon
+                            className={cn(
+                              "h-4 w-4 transition-transform",
+                              isExpanded && "rotate-90"
+                            )}
+                          />
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-500/20 text-xs">
+                            {ownerMember?.name[0]?.toUpperCase()}
+                          </span>
+                          {ownerMember?.name}&apos;s Items ({ownerFolders.length + ownerFiles.length})
+                        </button>
+                        {ownerFiles.length > 0 && (
+                          <label
+                            className={cn(
+                              "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-violet-500/10",
+                              allSelected ? "text-violet-400" : "text-zinc-500"
+                            )}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <span
+                              className={cn(
+                                "flex h-4 w-4 items-center justify-center rounded border-2 transition-colors",
+                                allSelected
+                                  ? "border-violet-500 bg-violet-500"
+                                  : someSelected
+                                    ? "border-violet-500 bg-violet-500/50"
+                                    : "border-zinc-600"
+                              )}
+                            >
+                              {(allSelected || someSelected) && (
+                                <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d={allSelected ? "M5 13l4 4L19 7" : "M20 12H4"} />
+                                </svg>
+                              )}
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={allSelected}
+                              onChange={() => toggleSelectAll(fileIds)}
+                              className="sr-only"
+                            />
+                            Select all
+                          </label>
+                        )}
+                      </div>
                       {isExpanded && (
                         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                           {ownerFolders.map(renderFolderCard)}
@@ -556,23 +664,61 @@ export default function DashboardPage() {
                     const memberFiles = groupedFiles[member._id] ?? [];
                     if (memberFolders.length === 0 && memberFiles.length === 0) return null;
                     const isExpanded = isSectionExpanded(member._id);
+                    const fileIds = memberFiles.map((f) => f._id);
+                    const allSelected = areAllSelected(fileIds);
+                    const someSelected = areSomeSelected(fileIds);
                     return (
                       <div key={member._id} className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
-                        <button
-                          onClick={() => toggleSection(member._id)}
-                          className="mb-0 flex w-full items-center gap-2 text-left text-sm font-medium text-zinc-400 hover:text-zinc-300"
-                        >
-                          <ChevronRightIcon
-                            className={cn(
-                              "h-4 w-4 transition-transform",
-                              isExpanded && "rotate-90"
-                            )}
-                          />
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-700 text-xs text-zinc-300">
-                            {member.name[0]?.toUpperCase()}
-                          </span>
-                          {member.name}&apos;s Items ({memberFolders.length + memberFiles.length})
-                        </button>
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={() => toggleSection(member._id)}
+                            className="flex items-center gap-2 text-left text-sm font-medium text-zinc-400 hover:text-zinc-300"
+                          >
+                            <ChevronRightIcon
+                              className={cn(
+                                "h-4 w-4 transition-transform",
+                                isExpanded && "rotate-90"
+                              )}
+                            />
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-700 text-xs text-zinc-300">
+                              {member.name[0]?.toUpperCase()}
+                            </span>
+                            {member.name}&apos;s Items ({memberFolders.length + memberFiles.length})
+                          </button>
+                          {memberFiles.length > 0 && (
+                            <label
+                              className={cn(
+                                "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-zinc-800",
+                                allSelected ? "text-violet-400" : "text-zinc-500"
+                              )}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <span
+                                className={cn(
+                                  "flex h-4 w-4 items-center justify-center rounded border-2 transition-colors",
+                                  allSelected
+                                    ? "border-violet-500 bg-violet-500"
+                                    : someSelected
+                                      ? "border-violet-500 bg-violet-500/50"
+                                      : "border-zinc-600"
+                                )}
+                              >
+                                {(allSelected || someSelected) && (
+                                  <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d={allSelected ? "M5 13l4 4L19 7" : "M20 12H4"} />
+                                  </svg>
+                                )}
+                              </span>
+                              <input
+                                type="checkbox"
+                                checked={allSelected}
+                                onChange={() => toggleSelectAll(fileIds)}
+                                className="sr-only"
+                              />
+                              Select all
+                            </label>
+                          )}
+                        </div>
                         {isExpanded && (
                           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                             {memberFolders.map(renderFolderCard)}
@@ -589,20 +735,58 @@ export default function DashboardPage() {
                   const unassignedFiles = groupedFiles.unassigned ?? [];
                   if (unassignedFolders.length === 0 && unassignedFiles.length === 0) return null;
                   const isExpanded = isSectionExpanded("unassigned");
+                  const fileIds = unassignedFiles.map((f) => f._id);
+                  const allSelected = areAllSelected(fileIds);
+                  const someSelected = areSomeSelected(fileIds);
                   return (
                     <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
-                      <button
-                        onClick={() => toggleSection("unassigned")}
-                        className="mb-0 flex w-full items-center gap-2 text-left text-sm font-medium text-zinc-400 hover:text-zinc-300"
-                      >
-                        <ChevronRightIcon
-                          className={cn(
-                            "h-4 w-4 transition-transform",
-                            isExpanded && "rotate-90"
-                          )}
-                        />
-                        Family Items ({unassignedFolders.length + unassignedFiles.length})
-                      </button>
+                      <div className="flex items-center justify-between">
+                        <button
+                          onClick={() => toggleSection("unassigned")}
+                          className="flex items-center gap-2 text-left text-sm font-medium text-zinc-400 hover:text-zinc-300"
+                        >
+                          <ChevronRightIcon
+                            className={cn(
+                              "h-4 w-4 transition-transform",
+                              isExpanded && "rotate-90"
+                            )}
+                          />
+                          Family Items ({unassignedFolders.length + unassignedFiles.length})
+                        </button>
+                        {unassignedFiles.length > 0 && (
+                          <label
+                            className={cn(
+                              "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-zinc-800",
+                              allSelected ? "text-violet-400" : "text-zinc-500"
+                            )}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <span
+                              className={cn(
+                                "flex h-4 w-4 items-center justify-center rounded border-2 transition-colors",
+                                allSelected
+                                  ? "border-violet-500 bg-violet-500"
+                                  : someSelected
+                                    ? "border-violet-500 bg-violet-500/50"
+                                    : "border-zinc-600"
+                              )}
+                            >
+                              {(allSelected || someSelected) && (
+                                <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d={allSelected ? "M5 13l4 4L19 7" : "M20 12H4"} />
+                                </svg>
+                              )}
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={allSelected}
+                              onChange={() => toggleSelectAll(fileIds)}
+                              className="sr-only"
+                            />
+                            Select all
+                          </label>
+                        )}
+                      </div>
                       {isExpanded && (
                         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                           {unassignedFolders.map(renderFolderCard)}
@@ -754,9 +938,10 @@ export default function DashboardPage() {
         <button
           onClick={() => setShowUploader(true)}
           className={cn(
-            "fixed bottom-6 right-6 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-violet-600 text-white shadow-lg",
-            "hover:bg-violet-500 active:bg-violet-700 transition-colors",
-            "md:bottom-8 md:right-8"
+            "fixed right-6 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-violet-600 text-white shadow-lg transition-all",
+            "hover:bg-violet-500 active:bg-violet-700",
+            "md:right-8",
+            selectionMode ? "bottom-20 md:bottom-24" : "bottom-6 md:bottom-8"
           )}
           aria-label="Upload files"
         >
@@ -807,6 +992,15 @@ export default function DashboardPage() {
         members={members}
         currentUserRole={currentUser?.role}
       />
+
+      {/* Bulk action bar */}
+      {isOwner && (
+        <BulkActionBar
+          selectedIds={selectedFiles}
+          onClearSelection={clearSelection}
+          familyMembers={members}
+        />
+      )}
     </div>
   );
 }
