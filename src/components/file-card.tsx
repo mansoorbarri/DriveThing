@@ -24,6 +24,7 @@ import {
   MoreIcon,
   UserIcon,
   MoveIcon,
+  EditIcon,
 } from "./icons";
 import { Button } from "./ui/button";
 import { Modal } from "./ui/modal";
@@ -87,8 +88,11 @@ export function FileCard({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isReassigning, setIsReassigning] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [newFileName, setNewFileName] = useState(name);
   const [shareStatus, setShareStatus] = useState<"idle" | "shared" | "copied">(
     "idle"
   );
@@ -96,6 +100,7 @@ export function FileCard({
 
   const deleteFile = useMutation(api.files.deleteFile);
   const updateAssignment = useMutation(api.files.updateFileAssignment);
+  const renameFileMutation = useMutation(api.files.renameFile);
 
   // All family members (including owner) can be assigned
   const assignableMembers = familyMembers;
@@ -127,6 +132,37 @@ export function FileCard({
   const handleOpenReassignModal = () => {
     setShowMenu(false);
     setShowReassignModal(true);
+  };
+
+  const handleOpenRenameModal = () => {
+    setShowMenu(false);
+    setNewFileName(name);
+    setShowRenameModal(true);
+  };
+
+  const handleRename = async () => {
+    if (!user || !newFileName.trim() || newFileName === name) return;
+    setIsRenaming(true);
+    try {
+      // Rename in Convex DB and get the file key
+      const result = await renameFileMutation({
+        fileId: id,
+        clerkId: user.id,
+        newName: newFileName.trim(),
+      });
+
+      // Rename on UploadThing storage
+      if (result?.fileKey) {
+        await fetch("/api/uploadthing/rename", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileKey: result.fileKey, newName: newFileName.trim() }),
+        });
+      }
+      setShowRenameModal(false);
+    } finally {
+      setIsRenaming(false);
+    }
   };
 
   const handleReassign = async (newAssignee?: Id<"users">) => {
@@ -398,6 +434,13 @@ export function FileCard({
               )}
               {isOwner && (
                 <>
+                  <button
+                    onClick={handleOpenRenameModal}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
+                  >
+                    <EditIcon className="h-4 w-4" />
+                    Rename
+                  </button>
                   {onMoveClick && (
                     <button
                       onClick={() => {
@@ -536,6 +579,49 @@ export function FileCard({
           {isReassigning && (
             <p className="mt-4 text-center text-sm text-zinc-500">Saving...</p>
           )}
+        </Modal>
+      )}
+
+      {/* Rename modal */}
+      {isOwner && (
+        <Modal
+          isOpen={showRenameModal}
+          onClose={() => setShowRenameModal(false)}
+          title="Rename file"
+        >
+          <div className="space-y-4">
+            <input
+              type="text"
+              value={newFileName}
+              onChange={(e) => setNewFileName(e.target.value)}
+              placeholder="Enter new file name"
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newFileName.trim() && newFileName !== name) {
+                  handleRename();
+                }
+              }}
+            />
+            <div className="flex gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => setShowRenameModal(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleRename}
+                loading={isRenaming}
+                disabled={!newFileName.trim() || newFileName === name}
+                className="flex-1"
+              >
+                Rename
+              </Button>
+            </div>
+          </div>
         </Modal>
       )}
     </>

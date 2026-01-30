@@ -413,6 +413,8 @@ export const renameFile = mutation({
     }
 
     await ctx.db.patch(args.fileId, { name: args.newName });
+
+    return { fileKey: file.fileKey };
   },
 });
 
