@@ -629,10 +629,14 @@ export const bulkDeleteFiles = mutation({
     clerkId: v.string(),
   },
   handler: async (ctx, args) => {
+    console.log("bulkDeleteFiles called with:", args.fileIds.length, "files");
+
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
       .unique();
+
+    console.log("Found user:", user?._id, "role:", user?.role);
 
     if (!user || user.role !== "owner") {
       throw new Error("Only owners can delete files");
@@ -642,12 +646,15 @@ export const bulkDeleteFiles = mutation({
 
     for (const fileId of args.fileIds) {
       const file = await ctx.db.get(fileId);
+      console.log("Processing file:", fileId, "found:", !!file, "uploadedBy:", file?.uploadedBy);
       if (file && file.uploadedBy === user._id) {
         fileKeys.push(file.fileKey);
         await ctx.db.delete(fileId);
+        console.log("Deleted file:", fileId);
       }
     }
 
+    console.log("bulkDeleteFiles completed, deleted:", fileKeys.length);
     return { fileKeys };
   },
 });
@@ -660,10 +667,14 @@ export const bulkMoveFiles = mutation({
     clerkId: v.string(),
   },
   handler: async (ctx, args) => {
+    console.log("bulkMoveFiles called with:", args.fileIds.length, "files, target folder:", args.folderId);
+
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
       .unique();
+
+    console.log("Found user:", user?._id, "role:", user?.role);
 
     if (!user || user.role !== "owner") {
       throw new Error("Only owners can move files");
@@ -679,10 +690,13 @@ export const bulkMoveFiles = mutation({
 
     for (const fileId of args.fileIds) {
       const file = await ctx.db.get(fileId);
+      console.log("Processing file:", fileId, "found:", !!file);
       if (file && file.uploadedBy === user._id) {
         await ctx.db.patch(fileId, { folderId: args.folderId });
+        console.log("Moved file:", fileId);
       }
     }
+    console.log("bulkMoveFiles completed");
   },
 });
 
@@ -694,20 +708,37 @@ export const bulkAssignFiles = mutation({
     clerkId: v.string(),
   },
   handler: async (ctx, args) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-      .unique();
+    try {
+      console.log("bulkAssignFiles called with:", {
+        fileIds: args.fileIds,
+        assignedTo: args.assignedTo,
+        clerkId: args.clerkId,
+      });
 
-    if (!user || user.role !== "owner") {
-      throw new Error("Only owners can assign files");
-    }
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+        .unique();
 
-    for (const fileId of args.fileIds) {
-      const file = await ctx.db.get(fileId);
-      if (file && file.uploadedBy === user._id) {
-        await ctx.db.patch(fileId, { assignedTo: args.assignedTo });
+      console.log("Found user:", user?._id, "role:", user?.role);
+
+      if (!user || user.role !== "owner") {
+        throw new Error("Only owners can assign files");
       }
+
+      for (const fileId of args.fileIds) {
+        const file = await ctx.db.get(fileId);
+        console.log("Processing file:", fileId, "found:", !!file, "uploadedBy:", file?.uploadedBy, "user._id:", user._id);
+        if (file && file.uploadedBy === user._id) {
+          console.log("Patching file with assignedTo:", args.assignedTo);
+          await ctx.db.patch(fileId, { assignedTo: args.assignedTo });
+          console.log("File patched successfully");
+        }
+      }
+      console.log("bulkAssignFiles completed");
+    } catch (error) {
+      console.error("bulkAssignFiles error:", error);
+      throw error;
     }
   },
 });

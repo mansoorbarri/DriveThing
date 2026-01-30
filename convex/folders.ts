@@ -713,7 +713,7 @@ export const bulkMoveFolders = mutation({
           if (currentParent === folderId) {
             continue; // Skip this folder, can't move into itself
           }
-          const parentFolder = await ctx.db.get(currentParent);
+          const parentFolder: Doc<"folders"> | null = await ctx.db.get(currentParent);
           currentParent = parentFolder?.parentFolderId;
         }
       }
