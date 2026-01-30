@@ -278,12 +278,48 @@ export default function DashboardPage() {
     return currentFolder?.assignedTo;
   }, [currentFolderId, allFolders]);
 
-  // Navigate to folder
-  const navigateToFolder = (folderId?: Id<"folders">) => {
+  // Navigate to folder with browser history support
+  const navigateToFolder = (folderId?: Id<"folders">, skipHistory = false) => {
     setCurrentFolderId(folderId);
     setSearchQuery("");
     setSelectedFiles(new Set()); // Clear selection when navigating
+    setSelectedFolders(new Set());
+
+    // Update browser history (unless navigating via back/forward button)
+    if (!skipHistory) {
+      const url = new URL(window.location.href);
+      if (folderId) {
+        url.searchParams.set("folder", folderId);
+      } else {
+        url.searchParams.delete("folder");
+      }
+      window.history.pushState({ folderId }, "", url.toString());
+    }
   };
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const folderId = event.state?.folderId as Id<"folders"> | undefined;
+      navigateToFolder(folderId, true); // Skip history push since we're responding to history change
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    // Initialize from URL on mount
+    const url = new URL(window.location.href);
+    const folderParam = url.searchParams.get("folder");
+    if (folderParam) {
+      setCurrentFolderId(folderParam as Id<"folders">);
+      // Replace current history state to include folder info
+      window.history.replaceState({ folderId: folderParam }, "", url.toString());
+    }
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Loading state
   if (!isLoaded || userWithFamily === undefined) {
