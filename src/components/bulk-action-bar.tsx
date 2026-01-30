@@ -64,51 +64,71 @@ export function BulkActionBar({
 
   const handleBulkDelete = async () => {
     if (!user) return;
+
+    // Get the current selection at call time
+    const fileIdsToDelete = Array.from(selectedFileIds);
+    const folderIdsToDelete = Array.from(selectedFolderIds);
+
+    console.log("Bulk delete started:", { fileIdsToDelete, folderIdsToDelete });
+
+    if (fileIdsToDelete.length === 0 && folderIdsToDelete.length === 0) {
+      console.warn("No items selected for deletion");
+      setShowDeleteConfirm(false);
+      return;
+    }
+
     setIsDeleting(true);
     try {
-      // Get the current selection at call time
-      const fileIdsToDelete = Array.from(selectedFileIds);
-      const folderIdsToDelete = Array.from(selectedFolderIds);
 
       // Delete files
       if (fileIdsToDelete.length > 0) {
+        console.log("Deleting files from Convex...");
         const result = await bulkDeleteFiles({
           fileIds: fileIdsToDelete,
           clerkId: user.id,
         });
+        console.log("Convex delete result:", result);
 
         // Delete from UploadThing storage
         if (result?.fileKeys && result.fileKeys.length > 0) {
-          await fetch("/api/uploadthing/delete", {
+          console.log("Deleting from UploadThing:", result.fileKeys);
+          const utResponse = await fetch("/api/uploadthing/delete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ fileKeys: result.fileKeys }),
           });
+          console.log("UploadThing delete response:", utResponse.ok);
         }
       }
 
       // Delete folders
       if (folderIdsToDelete.length > 0) {
+        console.log("Deleting folders from Convex...");
         const result = await bulkDeleteFolders({
           folderIds: folderIdsToDelete,
           deleteContents: true,
           clerkId: user.id,
         });
+        console.log("Convex folder delete result:", result);
 
         // Delete files inside folders from UploadThing storage
         if (result?.fileKeysToDelete && result.fileKeysToDelete.length > 0) {
-          await fetch("/api/uploadthing/delete", {
+          console.log("Deleting folder files from UploadThing:", result.fileKeysToDelete);
+          const utResponse = await fetch("/api/uploadthing/delete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ fileKeys: result.fileKeysToDelete }),
           });
+          console.log("UploadThing folder delete response:", utResponse.ok);
         }
       }
 
+      console.log("Bulk delete completed successfully");
       onClearSelection();
       setShowDeleteConfirm(false);
     } catch (error) {
       console.error("Failed to delete items:", error);
+      alert("Failed to delete items. Check console for details.");
     } finally {
       setIsDeleting(false);
     }
@@ -116,32 +136,48 @@ export function BulkActionBar({
 
   const handleBulkMove = async (folderId?: Id<"folders">) => {
     if (!user) return;
+
+    // Get the current selection at call time
+    const fileIdsToMove = Array.from(selectedFileIds);
+    const folderIdsToMove = Array.from(selectedFolderIds);
+
+    console.log("Bulk move started:", { fileIdsToMove, folderIdsToMove, targetFolderId: folderId });
+
+    if (fileIdsToMove.length === 0 && folderIdsToMove.length === 0) {
+      console.warn("No items selected for move");
+      setShowMoveModal(false);
+      return;
+    }
+
     setIsMoving(true);
     try {
-      // Get the current selection at call time
-      const fileIdsToMove = Array.from(selectedFileIds);
-      const folderIdsToMove = Array.from(selectedFolderIds);
 
       // Move files
       if (fileIdsToMove.length > 0) {
+        console.log("Moving files...");
         await bulkMoveFiles({
           fileIds: fileIdsToMove,
           folderId,
           clerkId: user.id,
         });
+        console.log("Files moved successfully");
       }
       // Move folders
       if (folderIdsToMove.length > 0) {
+        console.log("Moving folders...");
         await bulkMoveFolders({
           folderIds: folderIdsToMove,
           newParentFolderId: folderId,
           clerkId: user.id,
         });
+        console.log("Folders moved successfully");
       }
+      console.log("Bulk move completed successfully");
       onClearSelection();
       setShowMoveModal(false);
     } catch (error) {
       console.error("Failed to move items:", error);
+      alert("Failed to move items. Check console for details.");
     } finally {
       setIsMoving(false);
     }
@@ -149,32 +185,48 @@ export function BulkActionBar({
 
   const handleBulkAssign = async (assignedTo?: Id<"users">) => {
     if (!user) return;
+
+    // Get the current selection at call time
+    const fileIdsToAssign = Array.from(selectedFileIds);
+    const folderIdsToAssign = Array.from(selectedFolderIds);
+
+    console.log("Bulk assign started:", { fileIdsToAssign, folderIdsToAssign, assignedTo });
+
+    if (fileIdsToAssign.length === 0 && folderIdsToAssign.length === 0) {
+      console.warn("No items selected for assignment");
+      setShowAssignModal(false);
+      return;
+    }
+
     setIsAssigning(true);
     try {
-      // Get the current selection at call time
-      const fileIdsToAssign = Array.from(selectedFileIds);
-      const folderIdsToAssign = Array.from(selectedFolderIds);
 
       // Assign files
       if (fileIdsToAssign.length > 0) {
+        console.log("Assigning files...");
         await bulkAssignFiles({
           fileIds: fileIdsToAssign,
           assignedTo,
           clerkId: user.id,
         });
+        console.log("Files assigned successfully");
       }
       // Assign folders
       if (folderIdsToAssign.length > 0) {
+        console.log("Assigning folders...");
         await bulkAssignFolders({
           folderIds: folderIdsToAssign,
           assignedTo,
           clerkId: user.id,
         });
+        console.log("Folders assigned successfully");
       }
+      console.log("Bulk assign completed successfully");
       onClearSelection();
       setShowAssignModal(false);
     } catch (error) {
       console.error("Failed to assign items:", error);
+      alert("Failed to assign items. Check console for details.");
     } finally {
       setIsAssigning(false);
     }
