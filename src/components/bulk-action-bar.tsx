@@ -44,6 +44,7 @@ export function BulkActionBar({
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
 
   const bulkDeleteFiles = useMutation(api.files.bulkDeleteFiles);
   const bulkMoveFiles = useMutation(api.files.bulkMoveFiles);
@@ -65,10 +66,14 @@ export function BulkActionBar({
     if (!user) return;
     setIsDeleting(true);
     try {
+      // Get the current selection at call time
+      const fileIdsToDelete = Array.from(selectedFileIds);
+      const folderIdsToDelete = Array.from(selectedFolderIds);
+
       // Delete files
-      if (fileCount > 0) {
+      if (fileIdsToDelete.length > 0) {
         const result = await bulkDeleteFiles({
-          fileIds: Array.from(selectedFileIds),
+          fileIds: fileIdsToDelete,
           clerkId: user.id,
         });
 
@@ -83,9 +88,9 @@ export function BulkActionBar({
       }
 
       // Delete folders
-      if (folderCount > 0) {
+      if (folderIdsToDelete.length > 0) {
         const result = await bulkDeleteFolders({
-          folderIds: Array.from(selectedFolderIds),
+          folderIds: folderIdsToDelete,
           deleteContents: true,
           clerkId: user.id,
         });
@@ -102,6 +107,8 @@ export function BulkActionBar({
 
       onClearSelection();
       setShowDeleteConfirm(false);
+    } catch (error) {
+      console.error("Failed to delete items:", error);
     } finally {
       setIsDeleting(false);
     }
@@ -109,48 +116,65 @@ export function BulkActionBar({
 
   const handleBulkMove = async (folderId?: Id<"folders">) => {
     if (!user) return;
-    // Move files
-    if (fileCount > 0) {
-      await bulkMoveFiles({
-        fileIds: Array.from(selectedFileIds),
-        folderId,
-        clerkId: user.id,
-      });
+    setIsMoving(true);
+    try {
+      // Get the current selection at call time
+      const fileIdsToMove = Array.from(selectedFileIds);
+      const folderIdsToMove = Array.from(selectedFolderIds);
+
+      // Move files
+      if (fileIdsToMove.length > 0) {
+        await bulkMoveFiles({
+          fileIds: fileIdsToMove,
+          folderId,
+          clerkId: user.id,
+        });
+      }
+      // Move folders
+      if (folderIdsToMove.length > 0) {
+        await bulkMoveFolders({
+          folderIds: folderIdsToMove,
+          newParentFolderId: folderId,
+          clerkId: user.id,
+        });
+      }
+      onClearSelection();
+      setShowMoveModal(false);
+    } catch (error) {
+      console.error("Failed to move items:", error);
+    } finally {
+      setIsMoving(false);
     }
-    // Move folders
-    if (folderCount > 0) {
-      await bulkMoveFolders({
-        folderIds: Array.from(selectedFolderIds),
-        newParentFolderId: folderId,
-        clerkId: user.id,
-      });
-    }
-    onClearSelection();
-    setShowMoveModal(false);
   };
 
   const handleBulkAssign = async (assignedTo?: Id<"users">) => {
     if (!user) return;
     setIsAssigning(true);
     try {
+      // Get the current selection at call time
+      const fileIdsToAssign = Array.from(selectedFileIds);
+      const folderIdsToAssign = Array.from(selectedFolderIds);
+
       // Assign files
-      if (fileCount > 0) {
+      if (fileIdsToAssign.length > 0) {
         await bulkAssignFiles({
-          fileIds: Array.from(selectedFileIds),
+          fileIds: fileIdsToAssign,
           assignedTo,
           clerkId: user.id,
         });
       }
       // Assign folders
-      if (folderCount > 0) {
+      if (folderIdsToAssign.length > 0) {
         await bulkAssignFolders({
-          folderIds: Array.from(selectedFolderIds),
+          folderIds: folderIdsToAssign,
           assignedTo,
           clerkId: user.id,
         });
       }
       onClearSelection();
       setShowAssignModal(false);
+    } catch (error) {
+      console.error("Failed to assign items:", error);
     } finally {
       setIsAssigning(false);
     }
@@ -266,6 +290,7 @@ export function BulkActionBar({
           onClose={() => setShowMoveModal(false)}
           itemText={getItemText()}
           onMove={handleBulkMove}
+          isMoving={isMoving}
         />
       )}
 
@@ -326,15 +351,16 @@ function BulkMoveModal({
   onClose,
   itemText,
   onMove,
+  isMoving,
 }: {
   isOpen: boolean;
   onClose: () => void;
   itemText: string;
   onMove: (folderId?: Id<"folders">) => Promise<void>;
+  isMoving: boolean;
 }) {
   const { user } = useUser();
   const [selectedFolderId, setSelectedFolderId] = useState<Id<"folders"> | undefined>();
-  const [isMoving, setIsMoving] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const allFolders = useQuery(
@@ -350,12 +376,7 @@ function BulkMoveModal({
   const members = userWithFamily?.members ?? [];
 
   const handleMove = async () => {
-    setIsMoving(true);
-    try {
-      await onMove(selectedFolderId);
-    } finally {
-      setIsMoving(false);
-    }
+    await onMove(selectedFolderId);
   };
 
   // Group folders by assignee

@@ -12,13 +12,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { fileKey } = await request.json() as { fileKey: string };
+    const body = await request.json() as { fileKey?: string; fileKeys?: string[] };
+    const { fileKey, fileKeys } = body;
 
-    if (!fileKey) {
-      return NextResponse.json({ error: "File key required" }, { status: 400 });
+    // Handle both single fileKey and array of fileKeys
+    const keysToDelete = fileKeys ?? (fileKey ? [fileKey] : []);
+
+    if (keysToDelete.length === 0) {
+      return NextResponse.json({ error: "File key(s) required" }, { status: 400 });
     }
 
-    await utapi.deleteFiles(fileKey);
+    await utapi.deleteFiles(keysToDelete);
 
     return NextResponse.json({ success: true });
   } catch (error) {
