@@ -7,7 +7,6 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Button } from "./ui/button";
 import { Modal } from "./ui/modal";
-import { MoveModal } from "./move-modal";
 import {
   TrashIcon,
   MoveIcon,
@@ -62,11 +61,6 @@ export function BulkActionBar({
   const bulkDeleteFolders = useMutation(api.folders.bulkDeleteFolders);
   const bulkMoveFolders = useMutation(api.folders.bulkMoveFolders);
   const bulkAssignFolders = useMutation(api.folders.bulkAssignFolders);
-
-  const allFolders = useQuery(
-    api.folders.getAllFoldersForPicker,
-    user ? { clerkId: user.id } : "skip"
-  );
 
   const fileCount = selectedFileIds.size;
   const folderCount = selectedFolderIds.size;

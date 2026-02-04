@@ -613,7 +613,7 @@ export function FileCard({
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === "Enter" && newFileName.trim() && newFileName !== name) {
-                  handleRename();
+                  void handleRename();
                 }
               }}
             />
