@@ -204,9 +204,23 @@ export function FileCard({
     }
   };
 
-  const handleDownload = () => {
-    window.open(url, "_blank");
+  const handleDownload = async () => {
     setShowMenu(false);
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      // Fallback: open in new tab if download fails
+      window.open(url, "_blank");
+    }
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -408,7 +422,7 @@ export function FileCard({
                 className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
               >
                 <DownloadIcon className="h-4 w-4" />
-                Open file
+                Download
               </button>
               <button
                 onClick={handleShare}

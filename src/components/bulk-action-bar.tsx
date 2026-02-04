@@ -14,6 +14,7 @@ import {
   UserIcon,
   CloseIcon,
   FileIcon,
+  DownloadIcon,
 } from "./icons";
 import { cn } from "~/lib/utils";
 
@@ -25,9 +26,16 @@ interface FamilyMember {
   role?: "owner" | "member";
 }
 
+interface SelectedFileData {
+  id: Id<"files">;
+  name: string;
+  url: string;
+}
+
 interface BulkActionBarProps {
   selectedFileIds: Set<Id<"files">>;
   selectedFolderIds: Set<Id<"folders">>;
+  selectedFilesData: SelectedFileData[];
   onClearSelection: () => void;
   familyMembers: FamilyMember[];
 }
@@ -35,6 +43,7 @@ interface BulkActionBarProps {
 export function BulkActionBar({
   selectedFileIds,
   selectedFolderIds,
+  selectedFilesData,
   onClearSelection,
   familyMembers,
 }: BulkActionBarProps) {
@@ -45,6 +54,7 @@ export function BulkActionBar({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const bulkDeleteFiles = useMutation(api.files.bulkDeleteFiles);
   const bulkMoveFiles = useMutation(api.files.bulkMoveFiles);
@@ -195,6 +205,36 @@ export function BulkActionBar({
     }
   };
 
+  const handleBulkDownload = async () => {
+    if (selectedFilesData.length === 0) return;
+
+    setIsDownloading(true);
+    try {
+      // Download files sequentially to avoid overwhelming the browser
+      for (const file of selectedFilesData) {
+        try {
+          const response = await fetch(file.url);
+          const blob = await response.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = blobUrl;
+          link.download = file.name;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(blobUrl);
+          // Small delay between downloads
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        } catch {
+          // If one file fails, continue with others
+          console.error(`Failed to download ${file.name}`);
+        }
+      }
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   if (totalCount === 0) return null;
 
   // Build selection text
@@ -238,6 +278,18 @@ export function BulkActionBar({
           </div>
 
           <div className="flex items-center gap-2">
+            {selectedFilesData.length > 0 && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleBulkDownload}
+                loading={isDownloading}
+                className="gap-2"
+              >
+                <DownloadIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">Download</span>
+              </Button>
+            )}
             <Button
               variant="secondary"
               size="sm"

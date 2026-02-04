@@ -1111,6 +1111,11 @@ export default function DashboardPage() {
         <BulkActionBar
           selectedFileIds={selectedFiles}
           selectedFolderIds={selectedFolders}
+          selectedFilesData={
+            filteredMyFiles
+              ?.filter((f) => selectedFiles.has(f._id))
+              .map((f) => ({ id: f._id, name: f.name, url: f.url })) ?? []
+          }
           onClearSelection={clearSelection}
           familyMembers={members}
         />
