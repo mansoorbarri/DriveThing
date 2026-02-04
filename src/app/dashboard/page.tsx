@@ -300,7 +300,8 @@ export default function DashboardPage() {
   // Handle browser back/forward buttons
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
-      const folderId = event.state?.folderId as Id<"folders"> | undefined;
+      const state = event.state as { folderId?: Id<"folders"> } | null;
+      const folderId = state?.folderId;
       navigateToFolder(folderId, true); // Skip history push since we're responding to history change
     };
 
@@ -318,7 +319,6 @@ export default function DashboardPage() {
     return () => {
       window.removeEventListener("popstate", handlePopState);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Loading state

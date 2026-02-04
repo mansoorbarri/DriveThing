@@ -100,7 +100,7 @@ function shouldExcludeFile(filename: string): boolean {
 // Read a FileSystemEntry recursively to get all files with their paths
 async function readEntryRecursively(
   entry: FileSystemEntry,
-  path: string = ""
+  path = ""
 ): Promise<{ files: { file: File; relativePath: string }[]; folders: FolderToCreate[] }> {
   const files: { file: File; relativePath: string }[] = [];
   const folders: FolderToCreate[] = [];
@@ -163,10 +163,10 @@ async function getFolderStructure(
   const allFolders: FolderToCreate[] = [];
   let hasFolder = false;
 
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    // @ts-expect-error - webkitGetAsEntry is not in the types
-    const entry = item.webkitGetAsEntry?.() as FileSystemEntry | null;
+  for (const item of Array.from(items)) {
+    // webkitGetAsEntry is a non-standard API for drag-and-drop folder support
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+    const entry: FileSystemEntry | null = (item as any).webkitGetAsEntry?.() ?? null;
 
     if (entry) {
       if (entry.isDirectory) {
@@ -438,8 +438,8 @@ export function FileUploader({
 
       // Sort folders by depth (parents first) to create in correct order
       const sortedFolders = [...foldersToCreate].sort((a, b) => {
-        const depthA = (a.relativePath.match(/\//g) || []).length;
-        const depthB = (b.relativePath.match(/\//g) || []).length;
+        const depthA = (a.relativePath.match(/\//g) ?? []).length;
+        const depthB = (b.relativePath.match(/\//g) ?? []).length;
         return depthA - depthB;
       });
 
@@ -559,9 +559,10 @@ export function FileUploader({
       // Check if this is a folder drop
       const items = e.dataTransfer?.items;
       if (items) {
-        for (let i = 0; i < items.length; i++) {
-          // @ts-expect-error - webkitGetAsEntry is not in the types
-          const entry = items[i].webkitGetAsEntry?.() as FileSystemEntry | null;
+        for (const item of Array.from(items)) {
+          // webkitGetAsEntry is a non-standard API for drag-and-drop folder support
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+          const entry: FileSystemEntry | null = (item as any).webkitGetAsEntry?.() ?? null;
           if (entry?.isDirectory) {
             // It's a folder drop - use our custom handler
             await handleFolderDrop(e);

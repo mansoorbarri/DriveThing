@@ -10,12 +10,6 @@ import { Button } from "./ui/button";
 import { FolderIcon, HomeIcon, ChevronRightIcon, FamilyIcon } from "./icons";
 import { cn } from "~/lib/utils";
 
-interface FamilyMember {
-  _id: Id<"users">;
-  name: string;
-  role?: "owner" | "member";
-}
-
 interface MoveModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -70,10 +64,9 @@ export function MoveModal({
   const moveFile = useMutation(api.files.moveFile);
   const moveFolder = useMutation(api.folders.moveFolder);
 
-  const members = userWithFamily?.members ?? [];
-
   // Build folder tree grouped by assignee
   const groupedFolderTree = useMemo(() => {
+    const members = userWithFamily?.members ?? [];
     if (!allFolders || !members.length) return [];
 
     // Create nodes
@@ -153,7 +146,7 @@ export function MoveModal({
     }
 
     return groups;
-  }, [allFolders, members]);
+  }, [allFolders, userWithFamily?.members]);
 
   // Auto-expand all groups when data loads
   const effectiveExpandedGroups = useMemo(() => {

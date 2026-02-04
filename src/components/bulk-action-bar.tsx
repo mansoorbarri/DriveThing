@@ -445,7 +445,7 @@ function BulkMoveModal({
     (acc, folder) => {
       if (!folder.parentFolderId) {
         const key = folder.assignedTo ?? "unassigned";
-        acc[key] = acc[key] || [];
+        acc[key] = acc[key] ?? [];
         acc[key].push(folder);
       }
       return acc;
