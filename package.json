@@ -5,12 +5,12 @@
   "type": "module",
   "scripts": {
     "build": "next build",
-    "check": "next lint && tsc --noEmit",
+    "check": "npm run lint && tsc --noEmit",
     "dev": "next dev --turbo",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
     "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
-    "lint": "next lint",
-    "lint:fix": "next lint --fix",
+    "lint": "eslint src public/sw.js eslint.config.js next.config.js postcss.config.js prettier.config.js --max-warnings=0",
+    "lint:fix": "eslint src public/sw.js eslint.config.js next.config.js postcss.config.js prettier.config.js --fix",
     "preview": "next build && next start",
     "start": "next start",
     "typecheck": "tsc --noEmit"

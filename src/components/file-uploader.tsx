@@ -165,7 +165,7 @@ async function getFolderStructure(
 
   for (const item of Array.from(items)) {
     // webkitGetAsEntry is a non-standard API for drag-and-drop folder support
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const entry: FileSystemEntry | null = (item as any).webkitGetAsEntry?.() ?? null;
 
     if (entry) {
@@ -561,7 +561,7 @@ export function FileUploader({
       if (items) {
         for (const item of Array.from(items)) {
           // webkitGetAsEntry is a non-standard API for drag-and-drop folder support
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const entry: FileSystemEntry | null = (item as any).webkitGetAsEntry?.() ?? null;
           if (entry?.isDirectory) {
             // It's a folder drop - use our custom handler
