@@ -263,7 +263,7 @@ export function FileCard({
         )}
       >
         {/* Selection checkbox - shows on hover or when selected/in selection mode */}
-        {isOwner && onToggleSelect && (
+        {onToggleSelect && (
           <label
             className={cn(
               "absolute left-3 top-3 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-2 transition-all",

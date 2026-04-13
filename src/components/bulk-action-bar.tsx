@@ -37,6 +37,7 @@ interface BulkActionBarProps {
   selectedFilesData: SelectedFileData[];
   onClearSelection: () => void;
   familyMembers: FamilyMember[];
+  canManageItems?: boolean;
 }
 
 export function BulkActionBar({
@@ -45,6 +46,7 @@ export function BulkActionBar({
   selectedFilesData,
   onClearSelection,
   familyMembers,
+  canManageItems = false,
 }: BulkActionBarProps) {
   const { user } = useUser();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -284,33 +286,37 @@ export function BulkActionBar({
                 <span className="hidden sm:inline">Download</span>
               </Button>
             )}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowAssignModal(true)}
-              className="gap-2"
-            >
-              <UserIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Assign</span>
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowMoveModal(true)}
-              className="gap-2"
-            >
-              <MoveIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Move</span>
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => setShowDeleteConfirm(true)}
-              className="gap-2"
-            >
-              <TrashIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Delete</span>
-            </Button>
+            {canManageItems && (
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowAssignModal(true)}
+                  className="gap-2"
+                >
+                  <UserIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">Assign</span>
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowMoveModal(true)}
+                  className="gap-2"
+                >
+                  <MoveIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">Move</span>
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="gap-2"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">Delete</span>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -345,7 +351,7 @@ export function BulkActionBar({
       </Modal>
 
       {/* Move modal */}
-      {showMoveModal && (
+      {canManageItems && showMoveModal && (
         <BulkMoveModal
           isOpen={showMoveModal}
           onClose={() => setShowMoveModal(false)}
@@ -356,52 +362,54 @@ export function BulkActionBar({
       )}
 
       {/* Assign modal */}
-      <Modal
-        isOpen={showAssignModal}
-        onClose={() => setShowAssignModal(false)}
-        title={`Assign ${getItemText()}`}
-      >
-        <p className="mb-4 text-sm text-zinc-400">
-          Choose who {totalCount === 1 ? "this" : "these"} {fileCount > 0 && folderCount > 0 ? "items" : fileCount > 0 ? (fileCount === 1 ? "file" : "files") : (folderCount === 1 ? "folder" : "folders")} should be assigned to.
-        </p>
-        <div className="max-h-64 space-y-2 overflow-y-auto">
-          <button
-            onClick={() => handleBulkAssign(undefined)}
-            disabled={isAssigning}
-            className="flex w-full items-center gap-3 rounded-lg border border-zinc-700 p-3 text-left text-zinc-300 transition-colors hover:bg-zinc-800"
-          >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-700 text-zinc-400">
-              <FileIcon className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="font-medium">Unassigned</p>
-              <p className="text-xs text-zinc-500">Family documents</p>
-            </div>
-          </button>
-          {familyMembers.map((member) => (
+      {canManageItems && (
+        <Modal
+          isOpen={showAssignModal}
+          onClose={() => setShowAssignModal(false)}
+          title={`Assign ${getItemText()}`}
+        >
+          <p className="mb-4 text-sm text-zinc-400">
+            Choose who {totalCount === 1 ? "this" : "these"} {fileCount > 0 && folderCount > 0 ? "items" : fileCount > 0 ? (fileCount === 1 ? "file" : "files") : (folderCount === 1 ? "folder" : "folders")} should be assigned to.
+          </p>
+          <div className="max-h-64 space-y-2 overflow-y-auto">
             <button
-              key={member._id}
-              onClick={() => handleBulkAssign(member._id)}
+              onClick={() => handleBulkAssign(undefined)}
               disabled={isAssigning}
               className="flex w-full items-center gap-3 rounded-lg border border-zinc-700 p-3 text-left text-zinc-300 transition-colors hover:bg-zinc-800"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-700 text-zinc-300">
-                {member.name[0]?.toUpperCase()}
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-700 text-zinc-400">
+                <FileIcon className="h-4 w-4" />
               </div>
               <div>
-                <p className="font-medium">
-                  {member.name}
-                  {member.role === "owner" ? " (Owner)" : ""}
-                </p>
-                <p className="text-xs text-zinc-500">{member.email}</p>
+                <p className="font-medium">Unassigned</p>
+                <p className="text-xs text-zinc-500">Family documents</p>
               </div>
             </button>
-          ))}
-        </div>
-        {isAssigning && (
-          <p className="mt-4 text-center text-sm text-zinc-500">Assigning...</p>
-        )}
-      </Modal>
+            {familyMembers.map((member) => (
+              <button
+                key={member._id}
+                onClick={() => handleBulkAssign(member._id)}
+                disabled={isAssigning}
+                className="flex w-full items-center gap-3 rounded-lg border border-zinc-700 p-3 text-left text-zinc-300 transition-colors hover:bg-zinc-800"
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-700 text-zinc-300">
+                  {member.name[0]?.toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-medium">
+                    {member.name}
+                    {member.role === "owner" ? " (Owner)" : ""}
+                  </p>
+                  <p className="text-xs text-zinc-500">{member.email}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+          {isAssigning && (
+            <p className="mt-4 text-center text-sm text-zinc-500">Assigning...</p>
+          )}
+        </Modal>
+      )}
     </>
   );
 }

@@ -453,6 +453,10 @@ export default function DashboardPage() {
 
   // Check if we're in selection mode
   const selectionMode = selectedFiles.size > 0 || selectedFolders.size > 0;
+  const selectedFilesData =
+    (activeTab === "shared" ? filteredSharedFiles : filteredMyFiles)
+      .filter((file) => selectedFiles.has(file._id))
+      .map((file) => ({ id: file._id, name: file.name, url: file.url }));
 
   // Render file card with move handler
   const renderFileCard = (file: (typeof filteredMyFiles)[0]) => (
@@ -538,7 +542,7 @@ export default function DashboardPage() {
             onClick={() => {
               setActiveTab("my-files");
               setCurrentFolderId(undefined);
-              setSelectedFiles(new Set());
+              clearSelection();
             }}
             className={cn(
               "flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors",
@@ -556,7 +560,7 @@ export default function DashboardPage() {
             onClick={() => {
               setActiveTab("shared");
               setCurrentFolderId(undefined);
-              setSelectedFiles(new Set());
+              clearSelection();
             }}
             className={cn(
               "flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors",
@@ -880,10 +884,49 @@ export default function DashboardPage() {
                 {/* Files assigned to me */}
                 {filteredMyFiles.filter((f) => f.assignedTo).length > 0 && (
                   <div>
-                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
-                      My Files (
-                      {filteredMyFiles.filter((f) => f.assignedTo).length})
-                    </h3>
+                    {(() => {
+                      const assignedFiles = filteredMyFiles.filter((f) => f.assignedTo);
+                      const fileIds = assignedFiles.map((f) => f._id);
+                      const allSelected = areAllSelected(fileIds, []);
+                      const someSelected = areSomeSelected(fileIds, []);
+                      return (
+                        <div className="mb-4 flex items-center justify-between gap-3">
+                          <h3 className="text-sm font-medium text-zinc-400">
+                            My Files ({assignedFiles.length})
+                          </h3>
+                          <label
+                            className={cn(
+                              "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-zinc-800",
+                              allSelected ? "text-violet-400" : "text-zinc-500"
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "flex h-4 w-4 items-center justify-center rounded border-2 transition-colors",
+                                allSelected
+                                  ? "border-violet-500 bg-violet-500"
+                                  : someSelected
+                                    ? "border-violet-500 bg-violet-500/50"
+                                    : "border-zinc-600"
+                              )}
+                            >
+                              {(allSelected || someSelected) && (
+                                <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d={allSelected ? "M5 13l4 4L19 7" : "M20 12H4"} />
+                                </svg>
+                              )}
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={allSelected}
+                              onChange={() => toggleSelectAll(fileIds, [])}
+                              className="sr-only"
+                            />
+                            Select all
+                          </label>
+                        </div>
+                      );
+                    })()}
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {filteredMyFiles
                         .filter((f) => f.assignedTo)
@@ -895,10 +938,49 @@ export default function DashboardPage() {
                 {/* Family Documents (unassigned) */}
                 {filteredMyFiles.filter((f) => !f.assignedTo).length > 0 && (
                   <div>
-                    <h3 className="mb-4 text-sm font-medium text-zinc-400">
-                      Family Documents (
-                      {filteredMyFiles.filter((f) => !f.assignedTo).length})
-                    </h3>
+                    {(() => {
+                      const familyFiles = filteredMyFiles.filter((f) => !f.assignedTo);
+                      const fileIds = familyFiles.map((f) => f._id);
+                      const allSelected = areAllSelected(fileIds, []);
+                      const someSelected = areSomeSelected(fileIds, []);
+                      return (
+                        <div className="mb-4 flex items-center justify-between gap-3">
+                          <h3 className="text-sm font-medium text-zinc-400">
+                            Family Documents ({familyFiles.length})
+                          </h3>
+                          <label
+                            className={cn(
+                              "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-zinc-800",
+                              allSelected ? "text-violet-400" : "text-zinc-500"
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "flex h-4 w-4 items-center justify-center rounded border-2 transition-colors",
+                                allSelected
+                                  ? "border-violet-500 bg-violet-500"
+                                  : someSelected
+                                    ? "border-violet-500 bg-violet-500/50"
+                                    : "border-zinc-600"
+                              )}
+                            >
+                              {(allSelected || someSelected) && (
+                                <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d={allSelected ? "M5 13l4 4L19 7" : "M20 12H4"} />
+                                </svg>
+                              )}
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={allSelected}
+                              onChange={() => toggleSelectAll(fileIds, [])}
+                              className="sr-only"
+                            />
+                            Select all
+                          </label>
+                        </div>
+                      );
+                    })()}
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {filteredMyFiles
                         .filter((f) => !f.assignedTo)
@@ -968,12 +1050,51 @@ export default function DashboardPage() {
                     })
                     .map(([assigneeId, group]) => (
                       <div key={assigneeId}>
-                        <h3 className="mb-4 text-sm font-medium text-zinc-400">
-                          {group.assigneeName === "Family Documents"
-                            ? "Family Documents"
-                            : `${group.assigneeName}'s Files`}{" "}
-                          ({group.files.length})
-                        </h3>
+                        {(() => {
+                          const fileIds = group.files.map((file) => file._id);
+                          const allSelected = areAllSelected(fileIds, []);
+                          const someSelected = areSomeSelected(fileIds, []);
+                          return (
+                            <div className="mb-4 flex items-center justify-between gap-3">
+                              <h3 className="text-sm font-medium text-zinc-400">
+                                {group.assigneeName === "Family Documents"
+                                  ? "Family Documents"
+                                  : `${group.assigneeName}'s Files`}{" "}
+                                ({group.files.length})
+                              </h3>
+                              <label
+                                className={cn(
+                                  "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-zinc-800",
+                                  allSelected ? "text-violet-400" : "text-zinc-500"
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    "flex h-4 w-4 items-center justify-center rounded border-2 transition-colors",
+                                    allSelected
+                                      ? "border-violet-500 bg-violet-500"
+                                      : someSelected
+                                        ? "border-violet-500 bg-violet-500/50"
+                                        : "border-zinc-600"
+                                  )}
+                                >
+                                  {(allSelected || someSelected) && (
+                                    <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d={allSelected ? "M5 13l4 4L19 7" : "M20 12H4"} />
+                                    </svg>
+                                  )}
+                                </span>
+                                <input
+                                  type="checkbox"
+                                  checked={allSelected}
+                                  onChange={() => toggleSelectAll(fileIds, [])}
+                                  className="sr-only"
+                                />
+                                Select all
+                              </label>
+                            </div>
+                          );
+                        })()}
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                           {group.files.map((file) => (
                             <FileCard
@@ -993,6 +1114,9 @@ export default function DashboardPage() {
                               uploaderName={file.uploaderName}
                               familyMembers={members}
                               folderName={searchQuery && file.folderId ? folderNameMap.get(file.folderId) : undefined}
+                              selectionMode={selectionMode}
+                              isSelected={selectedFiles.has(file._id)}
+                              onToggleSelect={toggleFileSelection}
                             />
                           ))}
                         </div>
@@ -1107,17 +1231,14 @@ export default function DashboardPage() {
       />
 
       {/* Bulk action bar */}
-      {isOwner && (
+      {selectionMode && (
         <BulkActionBar
           selectedFileIds={selectedFiles}
           selectedFolderIds={selectedFolders}
-          selectedFilesData={
-            filteredMyFiles
-              ?.filter((f) => selectedFiles.has(f._id))
-              .map((f) => ({ id: f._id, name: f.name, url: f.url })) ?? []
-          }
+          selectedFilesData={selectedFilesData}
           onClearSelection={clearSelection}
           familyMembers={members}
+          canManageItems={isOwner}
         />
       )}
     </div>
