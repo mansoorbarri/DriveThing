@@ -26,6 +26,11 @@ import { PlusIcon, FileIcon, UploadIcon, FolderIcon, ChevronRightIcon } from "~/
 import { cn } from "~/lib/utils";
 
 type Tab = "my-files" | "shared";
+type SelectableItemKind = "file" | "folder";
+
+interface SelectionToggleOptions {
+  shiftKey?: boolean;
+}
 
 interface MoveTarget {
   type: "file" | "folder";
@@ -33,6 +38,16 @@ interface MoveTarget {
   name: string;
   currentFolderId?: Id<"folders">;
 }
+
+interface SelectionAnchor {
+  kind: SelectableItemKind;
+  id: Id<"files"> | Id<"folders">;
+  key: string;
+}
+
+type VisibleSelectableItem = SelectionAnchor;
+
+const getSelectionKey = (kind: SelectableItemKind, id: string) => `${kind}:${id}`;
 
 export default function DashboardPage() {
   const { user, isLoaded } = useUser();
@@ -48,6 +63,7 @@ export default function DashboardPage() {
   // Track selected files and folders for bulk actions
   const [selectedFiles, setSelectedFiles] = useState<Set<Id<"files">>>(new Set());
   const [selectedFolders, setSelectedFolders] = useState<Set<Id<"folders">>>(new Set());
+  const [lastSelectedItem, setLastSelectedItem] = useState<SelectionAnchor | null>(null);
   // Floating action button menu
   const [showFabMenu, setShowFabMenu] = useState(false);
 
@@ -278,12 +294,18 @@ export default function DashboardPage() {
     return currentFolder?.assignedTo;
   }, [currentFolderId, allFolders]);
 
+  const currentUser = userWithFamily?.user;
+  const members = userWithFamily?.members;
+  const isOwner = currentUser?.role === "owner";
+  const currentUserMemberId = currentUser?._id;
+
   // Navigate to folder with browser history support
   const navigateToFolder = (folderId?: Id<"folders">, skipHistory = false) => {
     setCurrentFolderId(folderId);
     setSearchQuery("");
     setSelectedFiles(new Set()); // Clear selection when navigating
     setSelectedFolders(new Set());
+    setLastSelectedItem(null);
 
     // Update browser history (unless navigating via back/forward button)
     if (!skipHistory) {
@@ -321,27 +343,6 @@ export default function DashboardPage() {
     };
   }, []);
 
-  // Loading state
-  if (!isLoaded || userWithFamily === undefined) {
-    return <DashboardSkeleton />;
-  }
-
-  // Not in a family yet - show setup
-  if (!userWithFamily?.family) {
-    return (
-      <main className="min-h-screen bg-[#0a0a0b]">
-        <FamilySetup />
-      </main>
-    );
-  }
-
-  const { family, members } = userWithFamily;
-  const currentUser = userWithFamily.user;
-  const isOwner = currentUser?.role === "owner";
-
-  // Get current user's member ID for default expanded section
-  const currentUserMemberId = currentUser?._id;
-
   // Check if a section should be expanded
   // Default: current user's section is expanded, others are collapsed
   const isSectionExpanded = (sectionId: string) => {
@@ -363,36 +364,108 @@ export default function DashboardPage() {
     });
   };
 
-  // Toggle file selection
-  const toggleFileSelection = (fileId: Id<"files">) => {
-    setSelectedFiles((prev) => {
-      const next = new Set(prev);
-      if (next.has(fileId)) {
-        next.delete(fileId);
-      } else {
-        next.add(fileId);
+  const visibleSelectableItems = useMemo(() => {
+    const items: VisibleSelectableItem[] = [];
+    const allMembers = members ?? [];
+    const pushFile = (file: { _id: Id<"files"> }) => {
+      items.push({
+        kind: "file",
+        id: file._id,
+        key: getSelectionKey("file", file._id),
+      });
+    };
+    const pushFolder = (folder: { _id: Id<"folders"> }) => {
+      items.push({
+        kind: "folder",
+        id: folder._id,
+        key: getSelectionKey("folder", folder._id),
+      });
+    };
+    const isExpanded = (sectionId: string) => {
+      if (toggledSections.has(sectionId)) {
+        return toggledSections.get(sectionId)!;
       }
-      return next;
-    });
-  };
+      return sectionId === currentUserMemberId;
+    };
 
-  // Toggle folder selection
-  const toggleFolderSelection = (folderId: Id<"folders">) => {
-    setSelectedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(folderId)) {
-        next.delete(folderId);
-      } else {
-        next.add(folderId);
+    if (activeTab === "shared") {
+      Object.entries(groupedSharedFiles ?? {})
+        .sort(([, a], [, b]) => {
+          if (a.assigneeName === "Family Documents") return 1;
+          if (b.assigneeName === "Family Documents") return -1;
+          return a.assigneeName.localeCompare(b.assigneeName);
+        })
+        .forEach(([, group]) => {
+          group.files.forEach(pushFile);
+        });
+      return items;
+    }
+
+    if (isOwner && groupedFiles) {
+      const ownerMember = allMembers.find((member) => member.role === "owner");
+      if (ownerMember) {
+        const ownerFolders = filteredMyFolders.filter(
+          (folder) => folder.assignedTo === ownerMember._id
+        );
+        const ownerFiles = groupedFiles[ownerMember._id] ?? [];
+        if (isExpanded(ownerMember._id)) {
+          ownerFolders.forEach(pushFolder);
+          ownerFiles.forEach(pushFile);
+        }
       }
-      return next;
-    });
-  };
+
+      allMembers
+        .filter((member) => member.role !== "owner")
+        .forEach((member) => {
+          const memberFolders = filteredMyFolders.filter(
+            (folder) => folder.assignedTo === member._id
+          );
+          const memberFiles = groupedFiles[member._id] ?? [];
+          if (isExpanded(member._id)) {
+            memberFolders.forEach(pushFolder);
+            memberFiles.forEach(pushFile);
+          }
+        });
+
+      const unassignedFolders = filteredMyFolders.filter((folder) => !folder.assignedTo);
+      const unassignedFiles = groupedFiles.unassigned ?? [];
+      if (isExpanded("unassigned")) {
+        unassignedFolders.forEach(pushFolder);
+        unassignedFiles.forEach(pushFile);
+      }
+      return items;
+    }
+
+    filteredMyFolders.forEach(pushFolder);
+    filteredMyFiles
+      .filter((file) => file.assignedTo)
+      .forEach(pushFile);
+    filteredMyFiles
+      .filter((file) => !file.assignedTo)
+      .forEach(pushFile);
+    return items;
+  }, [
+    activeTab,
+    currentUserMemberId,
+    filteredMyFiles,
+    filteredMyFolders,
+    groupedFiles,
+    groupedSharedFiles,
+    isOwner,
+    members,
+    toggledSections,
+  ]);
+
+  const visibleSelectionIndex = useMemo(
+    () => new Map(visibleSelectableItems.map((item, index) => [item.key, index])),
+    [visibleSelectableItems]
+  );
 
   // Clear all selections
   const clearSelection = () => {
     setSelectedFiles(new Set());
     setSelectedFolders(new Set());
+    setLastSelectedItem(null);
   };
 
   // Select all items in a group
@@ -421,6 +494,98 @@ export default function DashboardPage() {
       folderIds.forEach((id) => next.delete(id));
       return next;
     });
+  };
+
+  const toggleSelection = (
+    kind: SelectableItemKind,
+    id: Id<"files"> | Id<"folders">,
+    options: SelectionToggleOptions = {}
+  ) => {
+    const itemKey = getSelectionKey(kind, id);
+    const isCurrentlySelected =
+      kind === "file"
+        ? selectedFiles.has(id as Id<"files">)
+        : selectedFolders.has(id as Id<"folders">);
+    const shouldSelect = !isCurrentlySelected;
+
+    if (options.shiftKey && lastSelectedItem) {
+      const anchorIndex = visibleSelectionIndex.get(lastSelectedItem.key);
+      const targetIndex = visibleSelectionIndex.get(itemKey);
+
+      if (anchorIndex !== undefined && targetIndex !== undefined) {
+        const [start, end] =
+          anchorIndex < targetIndex
+            ? [anchorIndex, targetIndex]
+            : [targetIndex, anchorIndex];
+        const rangeItems = visibleSelectableItems.slice(start, end + 1);
+        const nextSelectedFiles = new Set(selectedFiles);
+        const nextSelectedFolders = new Set(selectedFolders);
+
+        rangeItems.forEach((item) => {
+          if (item.kind === "file") {
+            const fileId = item.id as Id<"files">;
+            if (shouldSelect) {
+              nextSelectedFiles.add(fileId);
+            } else {
+              nextSelectedFiles.delete(fileId);
+            }
+            return;
+          }
+
+          const folderId = item.id as Id<"folders">;
+          if (shouldSelect) {
+            nextSelectedFolders.add(folderId);
+          } else {
+            nextSelectedFolders.delete(folderId);
+          }
+        });
+
+        setSelectedFiles(nextSelectedFiles);
+        setSelectedFolders(nextSelectedFolders);
+        setLastSelectedItem({ kind, id, key: itemKey });
+        return;
+      }
+    }
+
+    if (kind === "file") {
+      const fileId = id as Id<"files">;
+      setSelectedFiles((prev) => {
+        const next = new Set(prev);
+        if (next.has(fileId)) {
+          next.delete(fileId);
+        } else {
+          next.add(fileId);
+        }
+        return next;
+      });
+    } else {
+      const folderId = id as Id<"folders">;
+      setSelectedFolders((prev) => {
+        const next = new Set(prev);
+        if (next.has(folderId)) {
+          next.delete(folderId);
+        } else {
+          next.add(folderId);
+        }
+        return next;
+      });
+    }
+
+    setLastSelectedItem({ kind, id, key: itemKey });
+  };
+
+  const toggleFileSelection = (
+    fileId: Id<"files">,
+    options?: SelectionToggleOptions
+  ) => {
+    toggleSelection("file", fileId, options);
+  };
+
+  const toggleFolderSelection = (
+    folderId: Id<"folders">,
+    options?: SelectionToggleOptions
+  ) => {
+    toggleSelection("folder", folderId, options);
   };
 
   // Check if all items in a group are selected
@@ -453,10 +618,33 @@ export default function DashboardPage() {
 
   // Check if we're in selection mode
   const selectionMode = selectedFiles.size > 0 || selectedFolders.size > 0;
+
+  useEffect(() => {
+    if (selectedFiles.size === 0 && selectedFolders.size === 0) {
+      setLastSelectedItem(null);
+    }
+  }, [selectedFiles, selectedFolders]);
+
   const selectedFilesData =
     (activeTab === "shared" ? filteredSharedFiles : filteredMyFiles)
       .filter((file) => selectedFiles.has(file._id))
       .map((file) => ({ id: file._id, name: file.name, url: file.url }));
+
+  // Loading state
+  if (!isLoaded || userWithFamily === undefined) {
+    return <DashboardSkeleton />;
+  }
+
+  // Not in a family yet - show setup
+  if (!userWithFamily.family) {
+    return (
+      <main className="min-h-screen bg-[#0a0a0b]">
+        <FamilySetup />
+      </main>
+    );
+  }
+
+  const { family, members: familyMembers } = userWithFamily;
 
   // Render file card with move handler
   const renderFileCard = (file: (typeof filteredMyFiles)[0]) => (
@@ -474,7 +662,7 @@ export default function DashboardPage() {
       assignedTo={file.assignedTo}
       assigneeName={file.assigneeName}
       isOwner={isOwner}
-      familyMembers={members}
+      familyMembers={familyMembers}
       folderId={file.folderId}
       folderName={searchQuery && file.folderId ? folderNameMap.get(file.folderId) : undefined}
       onMoveClick={
@@ -506,7 +694,7 @@ export default function DashboardPage() {
       assigneeName={folder.assigneeName}
       itemCount={folder.itemCount}
       isOwner={isOwner}
-      familyMembers={members}
+      familyMembers={familyMembers}
       parentFolderName={searchQuery && folder.parentFolderId ? folderNameMap.get(folder.parentFolderId) : undefined}
       onClick={() => navigateToFolder(folder._id)}
       onMoveClick={
@@ -644,7 +832,7 @@ export default function DashboardPage() {
               <div className="space-y-8">
                 {/* Owner's folders and files first */}
                 {(() => {
-                  const ownerMember = members.find((m) => m.role === "owner");
+                  const ownerMember = familyMembers.find((m) => m.role === "owner");
                   if (!ownerMember) return null;
                   const ownerFolders = filteredMyFolders.filter(
                     (f) => f.assignedTo === ownerMember._id
@@ -720,7 +908,7 @@ export default function DashboardPage() {
                 })()}
 
                 {/* Other members' folders and files */}
-                {members
+                {familyMembers
                   .filter((m) => m.role !== "owner")
                   .map((member) => {
                     const memberFolders = filteredMyFolders.filter(
@@ -1029,7 +1217,7 @@ export default function DashboardPage() {
                           assigneeName={folder.assigneeName}
                           itemCount={folder.itemCount}
                           isOwner={false}
-                          familyMembers={members}
+                          familyMembers={familyMembers}
                           parentFolderName={searchQuery && folder.parentFolderId ? folderNameMap.get(folder.parentFolderId) : undefined}
                           onClick={() => navigateToFolder(folder._id)}
                         />
@@ -1112,7 +1300,7 @@ export default function DashboardPage() {
                               assigneeName={file.assigneeName}
                               isOwner={false}
                               uploaderName={file.uploaderName}
-                              familyMembers={members}
+                              familyMembers={familyMembers}
                               folderName={searchQuery && file.folderId ? folderNameMap.get(file.folderId) : undefined}
                               selectionMode={selectionMode}
                               isSelected={selectedFiles.has(file._id)}
@@ -1193,7 +1381,7 @@ export default function DashboardPage() {
       >
         <FileUploader
           onClose={() => setShowUploader(false)}
-          familyMembers={members}
+          familyMembers={familyMembers}
           currentFolderId={currentFolderId}
           currentFolderAssignee={currentFolderAssignee}
           folders={allFolders ?? []}
@@ -1206,7 +1394,7 @@ export default function DashboardPage() {
         onClose={() => setShowCreateFolder(false)}
         parentFolderId={currentFolderId}
         parentFolderAssignee={currentFolderAssignee}
-        familyMembers={members}
+        familyMembers={familyMembers}
       />
 
       {/* Move modal */}
@@ -1226,7 +1414,7 @@ export default function DashboardPage() {
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         family={family}
-        members={members}
+        members={familyMembers}
         currentUserRole={currentUser?.role}
       />
 
@@ -1237,7 +1425,7 @@ export default function DashboardPage() {
           selectedFolderIds={selectedFolders}
           selectedFilesData={selectedFilesData}
           onClearSelection={clearSelection}
-          familyMembers={members}
+          familyMembers={familyMembers}
           canManageItems={isOwner}
         />
       )}

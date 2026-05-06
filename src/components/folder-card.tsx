@@ -44,7 +44,7 @@ interface FolderCardProps {
   // Selection props
   selectionMode?: boolean;
   isSelected?: boolean;
-  onToggleSelect?: (id: Id<"folders">) => void;
+  onToggleSelect?: (id: Id<"folders">, options?: { shiftKey?: boolean }) => void;
 }
 
 export function FolderCard({
@@ -176,7 +176,7 @@ export function FolderCard({
 
     // In selection mode, toggle selection instead of opening folder
     if (selectionMode && onToggleSelect) {
-      onToggleSelect(id);
+      onToggleSelect(id, { shiftKey: e.shiftKey });
       return;
     }
 
@@ -212,7 +212,11 @@ export function FolderCard({
             <input
               type="checkbox"
               checked={isSelected}
-              onChange={() => onToggleSelect(id)}
+              readOnly
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSelect(id, { shiftKey: e.shiftKey });
+              }}
               className="sr-only"
             />
             {isSelected && (

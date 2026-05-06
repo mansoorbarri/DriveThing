@@ -59,7 +59,7 @@ interface FileCardProps {
   // Selection props
   selectionMode?: boolean;
   isSelected?: boolean;
-  onToggleSelect?: (id: Id<"files">) => void;
+  onToggleSelect?: (id: Id<"files">, options?: { shiftKey?: boolean }) => void;
 }
 
 export function FileCard({
@@ -230,7 +230,7 @@ export function FileCard({
 
     // In selection mode, toggle selection instead of opening file
     if (selectionMode && onToggleSelect) {
-      onToggleSelect(id);
+      onToggleSelect(id, { shiftKey: e.shiftKey });
       return;
     }
 
@@ -280,7 +280,11 @@ export function FileCard({
             <input
               type="checkbox"
               checked={isSelected}
-              onChange={() => onToggleSelect(id)}
+              readOnly
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSelect(id, { shiftKey: e.shiftKey });
+              }}
               className="sr-only"
             />
             {isSelected && (
