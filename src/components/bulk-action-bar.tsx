@@ -259,7 +259,7 @@ export function BulkActionBar({
     <>
       {/* Fixed bottom action bar */}
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-700 bg-zinc-900/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <div className="flex items-center gap-3">
             <button
               onClick={onClearSelection}

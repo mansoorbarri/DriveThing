@@ -723,7 +723,14 @@ export default function DashboardPage() {
         onSettingsClick={() => setShowSettings(true)}
       />
 
-      <main className="mx-auto max-w-5xl px-4 py-6">
+      <main
+        className={cn(
+          "mx-auto max-w-5xl px-4 pt-6",
+          selectionMode
+            ? "pb-[calc(8rem+env(safe-area-inset-bottom))] md:pb-[calc(9rem+env(safe-area-inset-bottom))]"
+            : "pb-6"
+        )}
+      >
         {/* Tabs */}
         <div className="mb-6 flex gap-1 rounded-lg bg-zinc-900 p-1">
           <button
