@@ -7,13 +7,17 @@ import { useUser } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import {
+  canPreviewFile,
   cn,
+  downloadFile,
   formatFileSize,
   formatDate,
   getFileIcon,
+  openFileInNewTab,
   shareFile,
 } from "~/lib/utils";
 import {
+  EyeIcon,
   FileIcon,
   ImageIcon,
   PdfIcon,
@@ -29,6 +33,7 @@ import {
 import { Button } from "./ui/button";
 import { Modal } from "./ui/modal";
 import { ShareModal } from "./share-modal";
+import { FilePreviewModal, warmFilePreview } from "./file-preview-modal";
 
 interface FamilyMember {
   _id: Id<"users">;
@@ -87,6 +92,7 @@ export function FileCard({
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -111,8 +117,9 @@ export function FileCard({
   const isAssignedToMe = currentMember && assignedTo === currentMember._id;
   const canShare = isOwner || isAssignedToMe;
 
-  const fileIcon = getFileIcon(type);
+  const fileIcon = getFileIcon(type, name);
   const isImage = type.startsWith("image/");
+  const hasPreview = canPreviewFile(type, name);
 
   const handleShare = async () => {
     const canShare = typeof navigator !== "undefined" && "share" in navigator;
@@ -206,21 +213,20 @@ export function FileCard({
 
   const handleDownload = async () => {
     setShowMenu(false);
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
-    } catch {
-      // Fallback: open in new tab if download fails
-      window.open(url, "_blank");
+    await downloadFile(name, url);
+  };
+
+  const handleOpenPreview = () => {
+    setShowMenu(false);
+    setShowPreview(true);
+  };
+
+  const handleWarmPreview = () => {
+    if (!hasPreview) {
+      return;
     }
+
+    warmFilePreview({ name, url, type, size });
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -234,7 +240,12 @@ export function FileCard({
       return;
     }
 
-    window.open(url, "_blank");
+    if (hasPreview) {
+      setShowPreview(true);
+      return;
+    }
+
+    openFileInNewTab(url);
   };
 
   const IconComponent = {
@@ -255,6 +266,9 @@ export function FileCard({
     <>
       <div
         onClick={handleCardClick}
+        onMouseEnter={handleWarmPreview}
+        onFocus={handleWarmPreview}
+        onTouchStart={handleWarmPreview}
         className={cn(
           "group relative cursor-pointer rounded-xl border bg-zinc-900 transition-all",
           isSelected
@@ -421,6 +435,15 @@ export function FileCard({
               className="absolute right-3 top-12 z-20 w-48 rounded-lg border border-zinc-700 bg-zinc-800 py-1 shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
+              {hasPreview && (
+                <button
+                  onClick={handleOpenPreview}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
+                >
+                  <EyeIcon className="h-4 w-4" />
+                  Preview
+                </button>
+              )}
               <button
                 onClick={handleDownload}
                 className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
@@ -497,6 +520,12 @@ export function FileCard({
           </>
         )}
       </div>
+
+      <FilePreviewModal
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+        file={{ name, url, type, size }}
+      />
 
       {/* Delete confirmation modal */}
       <Modal
