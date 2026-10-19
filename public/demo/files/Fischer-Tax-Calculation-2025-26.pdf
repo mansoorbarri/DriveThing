@@ -1,0 +1,103 @@
+%PDF-1.4
+%ту╧╙
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+3 0 obj
+<< /Length 4529 >>
+stream
+0.42 0.29 0.86 rg 0 834 595 8 re f
+BT 0.12 0.1 0.2 rg /F2 15 Tf 56.00 796.00 Td (Hartwell Accounting) Tj ET
+BT 0.45 0.45 0.5 rg /F1 8.5 Tf 56.00 780.00 Td (12 Mill Lane, Harrogate HG1 2AB  |  hello@hartwell-accounting.example) Tj ET
+0.85 0.85 0.88 RG 0.7 w 56 768 m 539 768 l S
+BT 0.55 0.55 0.6 rg /F1 7.5 Tf 56.00 34.00 Td (Fictional sample document for the DriveThing demo. Not real financial or tax information.) Tj ET
+BT 0.55 0.55 0.6 rg /F1 7.5 Tf 515.23 34.00 Td (Page 1) Tj ET
+BT 0.1 0.1 0.12 rg /F2 20 Tf 56.00 738.00 Td (Tax calculation summary) Tj ET
+BT 0.45 0.45 0.5 rg /F1 10 Tf 56.00 710.00 Td (Taxpayer) Tj ET
+BT 0.1 0.1 0.12 rg /F2 10 Tf 206.00 710.00 Td (Lena Fischer) Tj ET
+BT 0.45 0.45 0.5 rg /F1 10 Tf 56.00 694.00 Td (UTR) Tj ET
+BT 0.1 0.1 0.12 rg /F2 10 Tf 206.00 694.00 Td (12345 67890 \(fictional\)) Tj ET
+BT 0.45 0.45 0.5 rg /F1 10 Tf 56.00 678.00 Td (Tax year) Tj ET
+BT 0.1 0.1 0.12 rg /F2 10 Tf 206.00 678.00 Td (6 April 2025 to 5 April 2026) Tj ET
+BT 0.45 0.45 0.5 rg /F1 10 Tf 56.00 662.00 Td (Return filed) Tj ET
+BT 0.1 0.1 0.12 rg /F2 10 Tf 206.00 662.00 Td (14 October 2026) Tj ET
+BT 0.45 0.45 0.5 rg /F1 10 Tf 56.00 646.00 Td (Balancing payment due) Tj ET
+BT 0.1 0.1 0.12 rg /F2 10 Tf 206.00 646.00 Td (31 January 2027) Tj ET
+BT 0.3 0.2 0.66 rg /F2 12.5 Tf 56.00 620.00 Td (Income) Tj ET
+0.93 0.92 0.98 rg 56 597 483 18.5 re f
+BT 0.1 0.1 0.12 rg /F2 9.5 Tf 62.00 602.00 Td () Tj ET
+BT 0.1 0.1 0.12 rg /F2 9.5 Tf 497.74 602.00 Td (Amount) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 583.50 Td (Self-employment profit \(Fischer Studio\)) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 485.46 583.50 Td (г48,310.00) Tj ET
+0.98 0.98 0.99 rg 56 560.0 483 18.5 re f
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 565.00 Td (UK bank interest) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 498.67 565.00 Td (г412.00) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 546.50 Td (Total income) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 485.46 546.50 Td (г48,722.00) Tj ET
+0.98 0.98 0.99 rg 56 523.0 483 18.5 re f
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 528.00 Td (Less personal allowance) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 479.13 528.00 Td (\(г12,570.00\)) Tj ET
+0.6 0.6 0.65 RG 0.7 w 56 524.0 m 539 524.0 l S
+BT 0.1 0.1 0.12 rg /F2 9.5 Tf 62.00 509.50 Td (Total taxable income) Tj ET
+BT 0.1 0.1 0.12 rg /F2 9.5 Tf 482.61 509.50 Td (г36,152.00) Tj ET
+BT 0.3 0.2 0.66 rg /F2 12.5 Tf 56.00 477.00 Td (Tax due) Tj ET
+0.93 0.92 0.98 rg 56 454.0 483 18.5 re f
+BT 0.1 0.1 0.12 rg /F2 9.5 Tf 62.00 459.00 Td () Tj ET
+BT 0.1 0.1 0.12 rg /F2 9.5 Tf 497.74 459.00 Td (Amount) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 440.50 Td (Basic rate 20% on г35,652.00) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 490.74 440.50 Td (г7,130.40) Tj ET
+0.98 0.98 0.99 rg 56 417.0 483 18.5 re f
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 422.00 Td (Savings 0% on г500.00 \(starting / allowance\)) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 509.23 422.00 Td (г0.00) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 403.50 Td (Class 4 NIC 6% on г35,740.00) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 490.74 403.50 Td (г2,144.40) Tj ET
+0.98 0.98 0.99 rg 56 380.0 483 18.5 re f
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 385.00 Td (Total income tax and NIC) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 490.74 385.00 Td (г9,274.80) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 366.50 Td (Less payments on account made) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 484.42 366.50 Td (\(г7,600.00\)) Tj ET
+0.98 0.98 0.99 rg 56 343.0 483 18.5 re f
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 348.00 Td (Balancing payment) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 490.74 348.00 Td (г1,674.80) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 329.50 Td (First payment on account 2026-27) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 490.74 329.50 Td (г4,637.40) Tj ET
+0.6 0.6 0.65 RG 0.7 w 56 325.5 m 539 325.5 l S
+BT 0.1 0.1 0.12 rg /F2 9.5 Tf 62.00 311.00 Td (Total due by 31 January 2027) Tj ET
+BT 0.1 0.1 0.12 rg /F2 9.5 Tf 488.21 311.00 Td (г6,312.20) Tj ET
+BT 0.3 0.2 0.66 rg /F2 12.5 Tf 56.00 278.50 Td (Notes from Eleanor) Tj ET
+BT 0.18 0.18 0.22 rg /F1 10 Tf 56.00 260.50 Td (Profit rose 14% on last year, mainly from the two retained branding clients. Your home office claim uses) Tj ET
+BT 0.18 0.18 0.22 rg /F1 10 Tf 56.00 246.00 Td (the flat rate of г26.00/month, and the new laptop has been claimed in full under the annual investment) Tj ET
+BT 0.18 0.18 0.22 rg /F1 10 Tf 56.00 231.50 Td (allowance. Please set aside the January total now. Happy to set up a monthly budget payment plan with) Tj ET
+BT 0.18 0.18 0.22 rg /F1 10 Tf 56.00 217.00 Td (HMRC if that helps.) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Type /Page /Parent 6 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
+endobj
+5 0 obj
+<< /Title (Tax Calculation 2025-26 - Lena Fischer) /Author (Hartwell Accounting - DriveThing demo) /Producer (DriveThing demo generator) >>
+endobj
+6 0 obj
+<< /Type /Pages /Kids [4 0 R] /Count 1 >>
+endobj
+7 0 obj
+<< /Type /Catalog /Pages 6 0 R >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000015 00000 n 
+0000000112 00000 n 
+0000000214 00000 n 
+0000004795 00000 n 
+0000004931 00000 n 
+0000005086 00000 n 
+0000005143 00000 n 
+trailer
+<< /Size 8 /Root 7 0 R /Info 5 0 R >>
+startxref
+5192
+%%EOF

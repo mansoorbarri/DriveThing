@@ -1,0 +1,96 @@
+%PDF-1.4
+%ту╧╙
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+3 0 obj
+<< /Length 4161 >>
+stream
+0.42 0.29 0.86 rg 0 834 595 8 re f
+BT 0.12 0.1 0.2 rg /F2 15 Tf 56.00 796.00 Td (Hartwell Accounting) Tj ET
+BT 0.45 0.45 0.5 rg /F1 8.5 Tf 56.00 780.00 Td (12 Mill Lane, Harrogate HG1 2AB  |  hello@hartwell-accounting.example) Tj ET
+0.85 0.85 0.88 RG 0.7 w 56 768 m 539 768 l S
+BT 0.55 0.55 0.6 rg /F1 7.5 Tf 56.00 34.00 Td (Fictional sample document for the DriveThing demo. Not real financial or tax information.) Tj ET
+BT 0.55 0.55 0.6 rg /F1 7.5 Tf 515.23 34.00 Td (Page 1) Tj ET
+BT 0.1 0.1 0.12 rg /F2 20 Tf 56.00 738.00 Td (VAT Return Summary) Tj ET
+BT 0.45 0.45 0.5 rg /F1 10 Tf 56.00 710.00 Td (Business) Tj ET
+BT 0.1 0.1 0.12 rg /F2 10 Tf 206.00 710.00 Td (Okafor's Bakery Ltd) Tj ET
+BT 0.45 0.45 0.5 rg /F1 10 Tf 56.00 694.00 Td (VAT registration no.) Tj ET
+BT 0.1 0.1 0.12 rg /F2 10 Tf 206.00 694.00 Td (GB 123 4567 89 \(fictional\)) Tj ET
+BT 0.45 0.45 0.5 rg /F1 10 Tf 56.00 678.00 Td (Period) Tj ET
+BT 0.1 0.1 0.12 rg /F2 10 Tf 206.00 678.00 Td (1 Jun 2026 to 31 Aug 2026) Tj ET
+BT 0.45 0.45 0.5 rg /F1 10 Tf 56.00 662.00 Td (Due date) Tj ET
+BT 0.1 0.1 0.12 rg /F2 10 Tf 206.00 662.00 Td (7 October 2026) Tj ET
+BT 0.45 0.45 0.5 rg /F1 10 Tf 56.00 646.00 Td (Submitted) Tj ET
+BT 0.1 0.1 0.12 rg /F2 10 Tf 206.00 646.00 Td (29 September 2026 via MTD bridge) Tj ET
+BT 0.45 0.45 0.5 rg /F1 10 Tf 56.00 630.00 Td (HMRC receipt) Tj ET
+BT 0.1 0.1 0.12 rg /F2 10 Tf 206.00 630.00 Td (MTD-2026-Q2-88F3A1) Tj ET
+BT 0.3 0.2 0.66 rg /F2 12.5 Tf 56.00 604.00 Td (Return boxes) Tj ET
+0.93 0.92 0.98 rg 56 581 483 18.5 re f
+BT 0.1 0.1 0.12 rg /F2 9.5 Tf 62.00 586.00 Td (Box) Tj ET
+BT 0.1 0.1 0.12 rg /F2 9.5 Tf 497.74 586.00 Td (Amount) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 567.50 Td (Box 1  VAT due on sales) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 485.46 567.50 Td (г14,862.40) Tj ET
+0.98 0.98 0.99 rg 56 544.0 483 18.5 re f
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 549.00 Td (Box 2  VAT due on EU acquisitions) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 509.23 549.00 Td (г0.00) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 530.50 Td (Box 3  Total VAT due) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 485.46 530.50 Td (г14,862.40) Tj ET
+0.98 0.98 0.99 rg 56 507.0 483 18.5 re f
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 512.00 Td (Box 4  VAT reclaimed on purchases) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 490.74 512.00 Td (г6,213.75) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 493.50 Td (Box 5  Net VAT payable to HMRC) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 490.74 493.50 Td (г8,648.65) Tj ET
+0.98 0.98 0.99 rg 56 470.0 483 18.5 re f
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 475.00 Td (Box 6  Total sales ex VAT) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 480.18 475.00 Td (г118,430.00) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 456.50 Td (Box 7  Total purchases ex VAT) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 485.46 456.50 Td (г41,260.00) Tj ET
+0.98 0.98 0.99 rg 56 433.0 483 18.5 re f
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 438.00 Td (Box 8  EU supplies of goods) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 509.23 438.00 Td (г0.00) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 62.00 419.50 Td (Box 9  EU acquisitions of goods) Tj ET
+BT 0.1 0.1 0.12 rg /F1 9.5 Tf 509.23 419.50 Td (г0.00) Tj ET
+BT 0.3 0.2 0.66 rg /F2 12.5 Tf 56.00 387.00 Td (Notes) Tj ET
+BT 0.42 0.29 0.86 rg /F1 10 Tf 62.00 369.00 Td (-) Tj ET
+BT 0.18 0.18 0.22 rg /F1 10 Tf 74.00 369.00 Td (Wholesale bread sales to cafes are standard rated where sold with seating; takeaway cold items are) Tj ET
+BT 0.18 0.18 0.22 rg /F1 10 Tf 74.00 354.50 Td (zero rated. A split of 61% standard / 39% zero rated was applied from the till reports.) Tj ET
+BT 0.42 0.29 0.86 rg /F1 10 Tf 62.00 338.00 Td (-) Tj ET
+BT 0.18 0.18 0.22 rg /F1 10 Tf 74.00 338.00 Td (New deck oven \(Rational iCombi, invoice RB-22841\) included in Box 4: VAT of г2,380.00.) Tj ET
+BT 0.42 0.29 0.86 rg /F1 10 Tf 62.00 321.50 Td (-) Tj ET
+BT 0.18 0.18 0.22 rg /F1 10 Tf 74.00 321.50 Td (Payment of г8,648.65 to be collected by HMRC direct debit on 10 October 2026.) Tj ET
+0.5 0.5 0.55 RG 0.7 w 56 287.0 m 236 287.0 l S
+BT 0.1 0.1 0.12 rg /F2 10 Tf 56.00 273.00 Td (Marcus Reid) Tj ET
+BT 0.45 0.45 0.5 rg /F1 9 Tf 56.00 260.00 Td (Bookkeeper, prepared 26 Sep 2026  -  reviewed by E. Hartwell) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Type /Page /Parent 6 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
+endobj
+5 0 obj
+<< /Title (VAT Return Q2 - Okafor's Bakery Ltd) /Author (Hartwell Accounting - DriveThing demo) /Producer (DriveThing demo generator) >>
+endobj
+6 0 obj
+<< /Type /Pages /Kids [4 0 R] /Count 1 >>
+endobj
+7 0 obj
+<< /Type /Catalog /Pages 6 0 R >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000015 00000 n 
+0000000112 00000 n 
+0000000214 00000 n 
+0000004427 00000 n 
+0000004563 00000 n 
+0000004715 00000 n 
+0000004772 00000 n 
+trailer
+<< /Size 8 /Root 7 0 R /Info 5 0 R >>
+startxref
+4821
+%%EOF
